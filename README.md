@@ -13,6 +13,20 @@ SFTP browser.
 - Xcode 26 or later
 - XcodeGen (`brew install xcodegen`)
 
+## Install with Homebrew
+
+The repository is its own tap. The build is ad-hoc signed, so install with
+the flag that skips the quarantine:
+
+```sh
+brew tap fballiano/termora https://github.com/fballiano/termora
+brew install --cask --no-quarantine termora
+```
+
+A tag `v*` builds the release: the workflow in
+`.github/workflows/release.yml` compiles the application, attaches the zip
+to a GitHub release, and points `Casks/termora.rb` at it.
+
 ## Build
 
 ```sh

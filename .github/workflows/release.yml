@@ -1,0 +1,72 @@
+name: Release
+
+# A tag `v*` builds the application, publishes a GitHub release with the
+# zip, and points the Homebrew cask in Casks/termora.rb at it. The repo is
+# its own tap:
+#
+#   brew tap fballiano/termora https://github.com/fballiano/termora
+#   brew install --cask --no-quarantine termora
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build
+        run: |
+          xcodegen generate
+          xcodebuild -project Termora.xcodeproj -scheme Termora \
+                     -configuration Release \
+                     -destination 'platform=macOS,arch=arm64' \
+                     -derivedDataPath build build
+
+      - name: Package
+        id: package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ditto -c -k --sequesterRsrc --keepParent \
+                build/Build/Products/Release/Termora.app "Termora-$VERSION.zip"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 "Termora-$VERSION.zip" | cut -d' ' -f1)" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "Termora-${{ steps.package.outputs.version }}.zip" \
+            --title "Termora ${{ steps.package.outputs.version }}" \
+            --generate-notes
+
+      - name: Point the cask at the release
+        run: |
+          git fetch origin main
+          git checkout main
+          VERSION="${{ steps.package.outputs.version }}"
+          SHA="${{ steps.package.outputs.sha256 }}"
+          sed -i '' \
+            -e "s|^  version \".*\"|  version \"$VERSION\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"$SHA\"|" \
+            Casks/termora.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "Point the Homebrew cask at $VERSION"
+          git push origin main

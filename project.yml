@@ -1,0 +1,127 @@
+name: Termora
+
+options:
+  bundleIdPrefix: com.fabrizioballiano
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  GhosttyKit:
+    path: Packages/GhosttyKit
+  TermoraModel:
+    path: Packages/TermoraModel
+  TermoraVault:
+    path: Packages/TermoraVault
+  TermoraSSH:
+    path: Packages/TermoraSSH
+  TermoraImport:
+    path: Packages/TermoraImport
+  TermoraSFTP:
+    path: Packages/TermoraSFTP
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  Termora:
+    type: application
+    platform: macOS
+    sources:
+      - path: Termora
+    dependencies:
+      - package: GhosttyKit
+        product: GhosttyTerminal
+      - package: GhosttyKit
+        product: GhosttyTheme
+      - package: TermoraModel
+        product: TermoraModel
+      - package: TermoraVault
+        product: TermoraVault
+      - package: TermoraSSH
+        product: TermoraSSH
+      - package: TermoraImport
+        product: TermoraImport
+      - package: TermoraSFTP
+        product: TermoraSFTP
+      - target: termora-askpass
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fabrizioballiano.Termora
+        PRODUCT_NAME: Termora
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_FILE: Termora/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Termora/Resources/Termora.entitlements
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+
+  termora-askpass:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Tools/termora-askpass/main.swift
+      - path: Packages/TermoraSSH/Sources/TermoraSSH/AskpassClient.swift
+    settings:
+      base:
+        PRODUCT_NAME: termora-askpass
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        SKIP_INSTALL: YES
+
+  TermoraUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: TermoraUITests
+    dependencies:
+      - target: Termora
+      - package: TermoraModel
+        product: TermoraModel
+      - package: TermoraVault
+        product: TermoraVault
+      - package: TermoraSSH
+        product: TermoraSSH
+      - package: TermoraImport
+        product: TermoraImport
+      - package: TermoraSFTP
+        product: TermoraSFTP
+      - target: termora-askpass
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fabrizioballiano.TermoraUITests
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        TEST_TARGET_NAME: Termora
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Termora:
+    build:
+      targets:
+        Termora: all
+        TermoraUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - TermoraUITests

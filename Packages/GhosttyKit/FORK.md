@@ -1,8 +1,14 @@
 # Why this copy exists
 
-This is a copy of `Lakr233/libghostty-spm` at Ghostty 1.3.1, taken so that
-Termora can fix one bug. The binary framework still comes from the upstream
-release, by URL and checksum, so only the Swift wrapper is ours.
+This is a copy of `Lakr233/libghostty-spm` at package version 1.4.0 (tag
+`356f730`, wrapping Ghostty 1.3.1), taken so that Termora can fix one bug.
+The binary framework still comes from the upstream release, by URL and
+checksum, so only the Swift wrapper is ours.
+
+The fix is proposed upstream as
+[Lakr233/libghostty-spm#50](https://github.com/Lakr233/libghostty-spm/pull/50).
+If that PR is merged and released, delete this copy and depend on the
+upstream package again.
 
 Read this file before you take a newer upstream version. Every change below
 must be made again, or the bug comes back.

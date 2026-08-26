@@ -96,7 +96,10 @@ targets:
       - path: Packages/TermoraSSH/Sources/TermoraSSH/AgentProtocol.swift
     settings:
       base:
-        PRODUCT_NAME: termora
+        # Not "termora": the disk is case-insensitive, so a tool named
+        # `termora` in Contents/MacOS overwrites the app binary `Termora`
+        # and the application stops launching.
+        PRODUCT_NAME: termora-cli
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
         SKIP_INSTALL: YES

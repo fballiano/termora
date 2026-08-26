@@ -8,7 +8,7 @@ cask "termora" do
   desc "SSH connection manager on the Ghostty terminal engine"
   homepage "https://github.com/fballiano/termora"
 
-  depends_on macos: ">= :tahoe"
+  depends_on macos: :tahoe
   depends_on arch: :arm64
 
   app "Termora.app"

@@ -282,7 +282,7 @@ never sees a password: it sends one request to the running application over
 a private Unix socket, and the application does the rest.
 
 ```bash
-alias termora=/Applications/Termora.app/Contents/MacOS/termora
+alias termora=/Applications/Termora.app/Contents/MacOS/termora-cli
 
 termora list                  # every bookmark, one per line
 termora status                # every open connection: name, state, tunnels
@@ -304,7 +304,7 @@ the request was refused; the reason is one line on standard error.
 One line for a project `CLAUDE.md`:
 
 ```
-`/Applications/Termora.app/Contents/MacOS/termora run <bookmark> -- <command…>` runs a command on a saved SSH server; `… list` names the bookmarks.
+`/Applications/Termora.app/Contents/MacOS/termora-cli run <bookmark> -- <command…>` runs a command on a saved SSH server; `… list` names the bookmarks.
 ```
 
 ## Importing from Royal TSX

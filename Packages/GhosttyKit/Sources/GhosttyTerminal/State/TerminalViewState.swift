@@ -113,6 +113,20 @@ public final class TerminalViewState: ObservableObject {
         return surface.sendText(text)
     }
 
+    /// Presses one named key on the attached surface, as if it was typed.
+    ///
+    /// Use this instead of ``send(_:)`` for keys such as Enter: text goes
+    /// through the paste path, and a shell with bracketed paste on inserts
+    /// a pasted `\r` instead of running the line.
+    @discardableResult
+    public func sendKey(_ key: TerminalKeyPress) -> Bool {
+        guard let surface else {
+            TerminalDebugLog.log(.input, "view state key ignored: missing surface")
+            return false
+        }
+        return surface.sendKeyPress(key)
+    }
+
     /// Invoke a named Ghostty binding action on the attached surface.
     @discardableResult
     public func performBindingAction(_ action: String) -> Bool {

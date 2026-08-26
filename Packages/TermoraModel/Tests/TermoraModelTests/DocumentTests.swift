@@ -172,11 +172,14 @@ func clashingForwards() {
 func decodesKeySequences() {
     // The sequence in the real document.
     #expect(KeySequence.steps(from: "cd /opt/maho/app{ENTER}")
-        == [.text("cd /opt/maho/app"), .text("\r")])
+        == [.text("cd /opt/maho/app"), .press(.enter)])
 
     #expect(KeySequence.steps(from: "su root{ENTER}{DELAY:500}password{ENTER}")
-        == [.text("su root"), .text("\r"), .wait(milliseconds: 500),
-            .text("password"), .text("\r")])
+        == [.text("su root"), .press(.enter), .wait(milliseconds: 500),
+            .text("password"), .press(.enter)])
+
+    // {SPACE} is ordinary text, so it stays inside the literal around it.
+    #expect(KeySequence.steps(from: "a{SPACE}b") == [.text("a b")])
 
     #expect(KeySequence.steps(from: "plain text") == [.text("plain text")])
     #expect(KeySequence.steps(from: "").isEmpty)

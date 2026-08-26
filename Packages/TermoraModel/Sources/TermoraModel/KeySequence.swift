@@ -11,26 +11,36 @@ import Foundation
 /// for example `cd /opt/maho/app{ENTER}`. The same form is kept here, so an
 /// imported sequence reads the way it did before.
 public enum KeySequence {
+    /// A key that is pressed, not typed as text.
+    ///
+    /// Text reaches the terminal through the paste path. A shell with
+    /// bracketed paste on inserts a pasted `\r` into its edit line instead
+    /// of running the line. A key press is never framed as a paste, so
+    /// `{ENTER}` always runs the command.
+    public enum Key: Hashable, Sendable {
+        case enter, tab, escape, backspace, up, down, left, right
+    }
+
     /// One thing to do, in order.
     public enum Step: Hashable, Sendable {
         case text(String)
+        case press(Key)
         case wait(milliseconds: Int)
     }
 
-    /// The names Royal TSX uses, and what each one sends.
-    static let keys: [String: String] = [
-        "ENTER": "\r",
-        "RETURN": "\r",
-        "TAB": "\t",
-        "ESC": "\u{1B}",
-        "ESCAPE": "\u{1B}",
-        "SPACE": " ",
-        "BACKSPACE": "\u{7F}",
-        "DELETE": "\u{7F}",
-        "UP": "\u{1B}[A",
-        "DOWN": "\u{1B}[B",
-        "RIGHT": "\u{1B}[C",
-        "LEFT": "\u{1B}[D",
+    /// The names Royal TSX uses, and the key each one presses.
+    static let keys: [String: Key] = [
+        "ENTER": .enter,
+        "RETURN": .enter,
+        "TAB": .tab,
+        "ESC": .escape,
+        "ESCAPE": .escape,
+        "BACKSPACE": .backspace,
+        "DELETE": .backspace,
+        "UP": .up,
+        "DOWN": .down,
+        "RIGHT": .right,
+        "LEFT": .left,
     ]
 
     /// The longest wait a sequence may ask for, so a typing mistake cannot
@@ -67,9 +77,11 @@ public enum KeySequence {
             }
 
             let name = String(rest[afterOpen ..< close]).uppercased()
-            if let sent = keys[name] {
+            if let key = keys[name] {
                 flush()
-                steps.append(.text(sent))
+                steps.append(.press(key))
+            } else if name == "SPACE" {
+                literal += " "
             } else if name.hasPrefix("DELAY:"), let value = Int(name.dropFirst(6)) {
                 flush()
                 steps.append(.wait(milliseconds: min(max(0, value), maximumWaitMilliseconds)))

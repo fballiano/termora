@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import GhosttyTerminal
 import SwiftUI
 import TermoraModel
 import TermoraSSH
@@ -433,9 +434,24 @@ final class SessionsController: ObservableObject {
             switch step {
             case let .text(piece):
                 session.send(piece)
+            case let .press(key):
+                session.press(Self.terminalKey(for: key))
             case let .wait(milliseconds):
                 try? await Task.sleep(for: .milliseconds(milliseconds))
             }
+        }
+    }
+
+    private static func terminalKey(for key: KeySequence.Key) -> TerminalKeyPress {
+        switch key {
+        case .enter: .enter
+        case .tab: .tab
+        case .escape: .escape
+        case .backspace: .backspace
+        case .up: .arrowUp
+        case .down: .arrowDown
+        case .left: .arrowLeft
+        case .right: .arrowRight
         }
     }
 

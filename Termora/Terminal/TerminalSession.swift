@@ -95,6 +95,16 @@ final class TerminalSession: Identifiable, ObservableObject {
         state.send(text)
     }
 
+    /// Press one named key in the pane.
+    ///
+    /// Text goes through the paste path: a shell with bracketed paste on
+    /// inserts a pasted `\r` instead of running the line. A key press is
+    /// never framed as a paste.
+    @discardableResult
+    func press(_ key: TerminalKeyPress) -> Bool {
+        state.sendKey(key)
+    }
+
     private func handleClose(processAlive: Bool) {
         isFinished = !processAlive
         onRequestClose?(self, processAlive)

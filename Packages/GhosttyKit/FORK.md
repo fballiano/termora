@@ -79,3 +79,23 @@ Files touched:
 The regression test is in the application repository:
 `TermoraUITests/TabSwitchDuringConnectTests.swift`, run through
 `Scripts/uitest-ssh.sh`.
+
+## The third change: programmatic key presses
+
+`TerminalViewState.send(_:)` reaches the terminal through
+`ghostty_surface_text`, which Ghostty routes through its clipboard-paste
+path. A remote shell with bracketed paste on (readline 8.1 and later turns
+it on by default) receives the text framed as `ESC[200~ … ESC[201~`, so a
+sent `\r` is inserted into the edit line instead of running it. Termora's
+"After connecting" `{ENTER}` therefore did nothing whenever it lost the
+race with the remote prompt.
+
+The addition: a public `TerminalKeyPress` enum and
+`TerminalViewState.sendKey(_:)` /
+`TerminalSurface.sendKeyPress(_:)`, which send a real key event through
+`ghostty_surface_key`. Key events are never paste-framed.
+
+Files touched:
+
+- `Sources/GhosttyTerminal/Surface/TerminalKeyPress.swift` (new)
+- `Sources/GhosttyTerminal/State/TerminalViewState.swift`

@@ -228,8 +228,11 @@ final class SessionsController: ObservableObject {
             errorMessage = engineError ?? "The SSH engine did not start."
             return
         }
+        engine.connectTimeout = .seconds(AppSettings.connectTimeoutSeconds)
 
-        let settings = store.index.effectiveSettings(for: connection)
+        let settings = store.index.effectiveSettings(
+            for: connection, fallback: AppSettings.connectionFallback
+        )
         guard !connection.host.isEmpty else {
             errorMessage = "\(connection.name) has no host name."
             return
@@ -424,6 +427,12 @@ final class SessionsController: ObservableObject {
         for other in tabs where other.id != tabID { closeTab(other.id) }
     }
 
+    /// Closes every tab and every connection. The auto-lock calls this, so a
+    /// locked document never leaves a live session behind it.
+    func closeAllTabs() {
+        for id in tabs.map(\.id) { closeTab(id) }
+    }
+
     func closeSelectedTab() {
         guard let selectedTabID else { return }
         closeTab(selectedTabID)
@@ -470,7 +479,9 @@ final class SessionsController: ObservableObject {
 extension SessionsController: SSHEngineDelegate {
     func storedSecret(for connectionID: UUID, prompt: AskpassPrompt) -> String? {
         guard let connection = store.index.connection(connectionID) else { return nil }
-        let settings = store.index.effectiveSettings(for: connection)
+        let settings = store.index.effectiveSettings(
+            for: connection, fallback: AppSettings.connectionFallback
+        )
 
         switch (prompt, settings.authentication) {
         case let (.password, .password(secret)):

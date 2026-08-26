@@ -27,6 +27,11 @@ public final class SSHEngine: ObservableObject {
 
     public weak var delegate: (any SSHEngineDelegate)?
 
+    /// How long a new connection may wait for authentication before it gives
+    /// up. The value is read when the connection starts, so a change applies
+    /// to the next connection, not to one already opening.
+    public var connectTimeout: Duration = .seconds(180)
+
     private let service: AskpassService
     private let helperPath: String
     private let controlDirectory: URL
@@ -73,7 +78,8 @@ public final class SSHEngine: ObservableObject {
             target: target,
             sessionToken: token,
             controlPath: controlPath,
-            environment: environment(forSession: token)
+            environment: environment(forSession: token),
+            readyTimeout: connectTimeout
         )
         tokens[token] = id
         connections[id] = connection

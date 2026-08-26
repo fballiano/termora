@@ -50,17 +50,19 @@ public final class SSHConnection: ObservableObject, Identifiable {
 
     /// How long to wait for authentication before giving up. A person may be
     /// typing a password or touching a security key.
-    private static let readyTimeout: Duration = .seconds(180)
+    private let readyTimeout: Duration
     private static let pollInterval: Duration = .milliseconds(200)
 
     init(id: UUID, name: String, target: SSHTarget, sessionToken: String,
-         controlPath: String, environment: [String: String]) {
+         controlPath: String, environment: [String: String],
+         readyTimeout: Duration = .seconds(180)) {
         self.id = id
         self.name = name
         self.target = target
         self.sessionToken = sessionToken
         self.controlPath = controlPath
         self.environment = environment
+        self.readyTimeout = readyTimeout
     }
 
     public var isConnected: Bool { state == .connected }
@@ -116,7 +118,7 @@ public final class SSHConnection: ObservableObject, Identifiable {
 
     /// Waits until `ssh -O check` succeeds, the master exits, or time runs out.
     private func waitUntilReady() async {
-        let deadline = ContinuousClock.now + Self.readyTimeout
+        let deadline = ContinuousClock.now + readyTimeout
         while ContinuousClock.now < deadline {
             if case .failed = state { return }
             if state == .disconnected { return }

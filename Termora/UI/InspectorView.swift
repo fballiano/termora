@@ -200,7 +200,9 @@ private struct SettingsEditor: View {
     let parentID: UUID?
 
     private var effective: EffectiveSettings {
-        store.index.effectiveSettings(of: settings, under: parentID)
+        store.index.effectiveSettings(
+            of: settings, under: parentID, fallback: AppSettings.connectionFallback
+        )
     }
 
     private func source<Value>(_ keyPath: KeyPath<NodeSettings, Inherited<Value>>) -> String? {

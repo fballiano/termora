@@ -115,22 +115,32 @@ public struct DocumentIndex: Sendable {
     /// Resolves every setting of a connection against its folder chain.
     ///
     /// For each field the search starts at the connection. The first node that
-    /// sets a value wins. When no node in the chain sets one,
-    /// `EffectiveSettings.fallback` supplies it.
-    public func effectiveSettings(for connection: Connection) -> EffectiveSettings {
-        effectiveSettings(of: connection.settings, under: connection.parentID)
+    /// sets a value wins. When no node in the chain sets one, `fallback`
+    /// supplies it. The application passes its own fallback here, so a person
+    /// can choose the defaults without touching any document.
+    public func effectiveSettings(
+        for connection: Connection,
+        fallback: EffectiveSettings = .fallback
+    ) -> EffectiveSettings {
+        effectiveSettings(of: connection.settings, under: connection.parentID, fallback: fallback)
     }
 
     /// The same search for a folder. The inspector uses it to show a folder
     /// what it would pass down.
-    public func effectiveSettings(for folder: Folder) -> EffectiveSettings {
-        effectiveSettings(of: folder.settings, under: folder.parentID)
+    public func effectiveSettings(
+        for folder: Folder,
+        fallback: EffectiveSettings = .fallback
+    ) -> EffectiveSettings {
+        effectiveSettings(of: folder.settings, under: folder.parentID, fallback: fallback)
     }
 
     /// The search itself: start at `settings`, then walk up from `parentID`.
-    public func effectiveSettings(of settings: NodeSettings, under parentID: UUID?) -> EffectiveSettings {
-        let fallback = EffectiveSettings.fallback
-        return EffectiveSettings(
+    public func effectiveSettings(
+        of settings: NodeSettings,
+        under parentID: UUID?,
+        fallback: EffectiveSettings = .fallback
+    ) -> EffectiveSettings {
+        EffectiveSettings(
             username: resolve(\.username, settings, parentID, fallback.username),
             authentication: resolve(\.authentication, settings, parentID, fallback.authentication),
             jumpHost: resolve(\.jumpHost, settings, parentID, fallback.jumpHost),

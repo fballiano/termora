@@ -17,16 +17,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         -> NSApplication.TerminateReply {
         guard let sessions, !sessions.tabs.isEmpty else { return .terminateNow }
 
-        let count = sessions.tabs.count
-        let alert = NSAlert()
-        alert.messageText = count == 1
-            ? "Quit with one open session?"
-            : "Quit with \(count) open sessions?"
-        alert.informativeText = "Every connection closes, with its tunnels."
-        alert.addButton(withTitle: "Quit")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return .terminateCancel
+        if AppSettings.confirmQuit {
+            let count = sessions.tabs.count
+            let alert = NSAlert()
+            alert.messageText = count == 1
+                ? "Quit with one open session?"
+                : "Quit with \(count) open sessions?"
+            alert.informativeText = "Every connection closes, with its tunnels."
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                return .terminateCancel
+            }
         }
 
         // The control masters get an orderly `-O exit`, so no ssh process
@@ -45,15 +47,20 @@ struct TermoraApp: App {
     @StateObject private var store: DocumentStore
     @StateObject private var sessions: SessionsController
     @StateObject private var importer: ImportController
+    @StateObject private var autoLock: AutoLockController
 
     init() {
+        // Before anything reads a setting, so every reader sees one default.
+        AppSettings.registerDefaults()
         let store = MainActor.assumeIsolated { DocumentStore() }
         _store = StateObject(wrappedValue: store)
-        _sessions = StateObject(wrappedValue: MainActor.assumeIsolated {
-            SessionsController(store: store)
-        })
+        let sessions = MainActor.assumeIsolated { SessionsController(store: store) }
+        _sessions = StateObject(wrappedValue: sessions)
         _importer = StateObject(wrappedValue: MainActor.assumeIsolated {
             ImportController(store: store)
+        })
+        _autoLock = StateObject(wrappedValue: MainActor.assumeIsolated {
+            AutoLockController(store: store, sessions: sessions)
         })
     }
 
@@ -151,6 +158,12 @@ struct TermoraApp: App {
                     .keyboardShortcut("l", modifiers: [.command, .control])
                     .disabled(!store.isUnlocked)
             }
+        }
+
+        // Termora, Settings… (⌘,).
+        Settings {
+            SettingsView()
+                .environmentObject(store)
         }
     }
 }

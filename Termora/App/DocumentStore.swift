@@ -50,7 +50,8 @@ final class DocumentStore: ObservableObject {
             .stringArray(forKey: Self.recentDocumentsKey) ?? [])
             .filter { FileManager.default.fileExists(atPath: $0) }
             .map { URL(fileURLWithPath: $0) }
-        if let path = UserDefaults.standard.string(forKey: Self.lastDocumentKey),
+        if AppSettings.opensLastDocumentAtLaunch,
+           let path = UserDefaults.standard.string(forKey: Self.lastDocumentKey),
            FileManager.default.fileExists(atPath: path) {
             let url = URL(fileURLWithPath: path)
             documentURL = url
@@ -183,6 +184,64 @@ final class DocumentStore: ObservableObject {
         phase = .unlocked
         UserDefaults.standard.set(vault.url.path, forKey: Self.lastDocumentKey)
         rememberRecent(vault.url)
+    }
+
+    // MARK: - Security settings
+
+    /// True when the open document has a key waiting behind Touch ID.
+    var isTouchIDEnabled: Bool {
+        guard let documentURL else { return false }
+        return hasStoredKey(for: documentURL)
+    }
+
+    /// Remembers the open document behind Touch ID, without asking for the
+    /// password again. Returns the reason it could not, or `nil` on success.
+    func enableTouchID() -> String? {
+        guard let vault else { return "Open the document first." }
+        let material = vault.keyMaterial
+        return VaultKeyStore.store(key: material.key, salt: material.salt, for: vault.url)
+    }
+
+    /// Drops the stored key. The document then opens with the password only.
+    func forgetTouchIDKey() {
+        guard let documentURL,
+              let header = try? Vault.inspect(at: documentURL) else { return }
+        VaultKeyStore.removeKey(salt: header.kdf.salt, for: documentURL)
+    }
+
+    /// Replaces the master password of the open document.
+    ///
+    /// The current password is proved against the file first, so a person at
+    /// an unlocked Mac cannot lock the owner out. Returns the problem, or
+    /// `nil` on success.
+    func changeMasterPassword(current: String, to newPassword: String) async -> String? {
+        guard let vault else { return "Open the document first." }
+        do {
+            _ = try await Vault.open(at: vault.url, password: current)
+        } catch {
+            return "The current password is not correct."
+        }
+
+        // The salt changes with the password, so the old Touch ID record
+        // stops matching. Remember its state, then replace it.
+        let hadTouchID = isTouchIDEnabled
+        let oldSalt = vault.keyMaterial.salt
+        do {
+            try await vault.changePassword(to: newPassword)
+        } catch {
+            return "Termora could not save the document. \(error.localizedDescription)"
+        }
+        VaultKeyStore.removeKey(salt: oldSalt, for: vault.url)
+        if hadTouchID {
+            let material = vault.keyMaterial
+            if let problem = VaultKeyStore.store(
+                key: material.key, salt: material.salt, for: vault.url
+            ) {
+                return "The password changed, but Termora could not remember "
+                    + "it for Touch ID. \(problem)"
+            }
+        }
+        return nil
     }
 
     // MARK: - Changes

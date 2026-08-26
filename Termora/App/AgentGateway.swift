@@ -97,12 +97,20 @@ final class AgentGateway: ObservableObject {
         guard let words = request.words, !words.isEmpty else {
             return .refused("Give a command to run.")
         }
-        let matches = store.index.document.connections.filter { $0.name == name }
+        // `list` prints the full `path / name` form, so accept that first;
+        // a bare name still works when it is unambiguous.
+        let index = store.index
+        let connections = index.document.connections
+        let byFullName = connections.filter { fullName(of: $0) == name }
+        let matches = byFullName.isEmpty ? connections.filter { $0.name == name } : byFullName
         guard let connection = matches.first else {
             return .refused("No bookmark is named \"\(name)\".")
         }
         guard matches.count == 1 else {
-            return .refused("\(matches.count) bookmarks are named \"\(name)\". Rename one.")
+            return .refused(
+                "\(matches.count) bookmarks are named \"\(name)\". "
+                    + "Use the full name that `termora list` prints."
+            )
         }
         switch await sessions.agentConnect(connection: connection) {
         case let .success(sshConnection):
@@ -110,6 +118,13 @@ final class AgentGateway: ObservableObject {
         case let .failure(reason):
             return .refused(reason)
         }
+    }
+
+    /// The name that `list` prints for a connection, for example
+    /// `Prod / Web / web1`.
+    private func fullName(of connection: Connection) -> String {
+        let path = store.index.folderPath(ofParent: connection.parentID)
+        return path.isEmpty ? connection.name : "\(path) / \(connection.name)"
     }
 
     private func describe(_ state: SSHConnection.State) -> String {

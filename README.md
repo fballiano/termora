@@ -1,31 +1,85 @@
-# Termora
+<div align="center">
+<img src="Docs/icon.png" width="128" alt="Termora" />
+<h1>Termora</h1>
+<p><strong>SSH connections, tunnels and files in one encrypted document.</strong></p>
+<p>
+<a href="https://github.com/fballiano/termora/releases/latest"><img src="https://img.shields.io/github/v/release/fballiano/termora?style=for-the-badge&color=1E8A5F&labelColor=1B1F23" alt="Latest release" /></a>
+<a href="https://github.com/fballiano/termora/releases"><img src="https://img.shields.io/github/downloads/fballiano/termora/total?style=for-the-badge&color=1E8A5F&labelColor=1B1F23" alt="Downloads" /></a>
+<img src="https://img.shields.io/badge/macOS-26%2B-1E8A5F?style=for-the-badge&labelColor=1B1F23&logo=apple&logoColor=white" alt="macOS 26 or later" />
+<a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-1E8A5F?style=for-the-badge&labelColor=1B1F23" alt="MIT licence" /></a>
+</p>
+<p><a href="https://github.com/fballiano/termora/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-1E8A5F?style=for-the-badge&labelColor=1E8A5F&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTQgMTd2MmEyIDIgMCAwIDAgMiAyaDEyYTIgMiAwIDAgMCAyIC0ydi0yIi8+PHBhdGggZD0iTTcgMTFsNSA1bDUgLTUiLz48cGF0aCBkPSJNMTIgNGwwIDEyIi8+PC9zdmc+" alt="Download for macOS" height="36" /></a></p>
+</div>
 
-A native macOS connection manager for SSH. It embeds the Ghostty terminal
-engine through libghostty.
+<table align=center><tr><td align=center>
+<strong>If you find my work valuable, please consider sponsoring</strong><br />
+<a href="https://github.com/sponsors/fballiano" target=_blank title="Sponsor me on GitHub"><img src="https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=#white" alt="Sponsor me on GitHub" /></a>
+<a href="https://www.buymeacoffee.com/fballiano" target=_blank title="Buy me a coffee"><img src="https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" /></a>
+<a href="https://www.paypal.com/paypalme/fabrizioballiano" target=_blank title="Donate via PayPal"><img src="https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white" alt="Donate via PayPal" /></a>
+</td></tr></table>
 
-Termora replaces Royal TSX for SSH work: a bookmark tree with folders,
-inherited credentials, terminal tabs and splits, port forwarding, and an
-SFTP browser.
+---
 
-## Requirements
+Termora replaces Royal TSX for SSH work. It embeds the Ghostty terminal
+engine through libghostty, and it drives the OpenSSH of macOS, so your
+`~/.ssh/config`, your keys and your agent all work as they stand.
+
+## Features
+
+<table>
+<tr><td><b>A bookmark tree</b></td><td>Folders pass credentials and settings down. A connection overrides only what it sets.</td></tr>
+<tr><td><b>Your terminal</b></td><td>The Ghostty engine reads your own Ghostty configuration, so a pane looks like your terminal.</td></tr>
+<tr><td><b>One connection</b></td><td>One control master carries every pane, every tunnel and the file browser. Nothing authenticates twice.</td></tr>
+<tr><td><b>Tabs and splits</b></td><td>Tabs live in the title bar. ⌘D splits right, ⇧⌘D splits down, ⌘1…⌘9 switch.</td></tr>
+<tr><td><b>Live tunnels</b></td><td>Local, remote and SOCKS. A switch opens or closes a tunnel on an open connection, with no reconnect.</td></tr>
+<tr><td><b>A file browser</b></td><td>This Mac on the left, the far host on the right. Drag both ways, with Finder file promises.</td></tr>
+<tr><td><b>One encrypted file</b></td><td>AES-256-GCM behind a master password. Put it wherever you sync your files.</td></tr>
+<tr><td><b>Touch ID</b></td><td>The key can rest in the Secure Enclave, so unlock is one touch. The password still works anywhere.</td></tr>
+<tr><td><b>Royal TSX import</b></td><td>Folders, connections, tasks and saved passwords come across, with a report of everything that did not.</td></tr>
+</table>
+
+## Install
+
+With [Homebrew](https://brew.sh):
+
+```bash
+brew tap fballiano/termora https://github.com/fballiano/termora
+brew trust --cask fballiano/termora/termora
+brew install --cask fballiano/termora/termora
+```
+
+The URL is part of the first command, because this repository is the tap
+itself. Homebrew 6 refuses a cask from a tap outside `Homebrew/*` until you
+trust it, so the second command is also necessary. The full name in the
+third command matters too: a different application also called “termora”
+exists in the main cask repository.
+
+Or download the zip from the
+[latest release](https://github.com/fballiano/termora/releases/latest) and
+drag **Termora** into **Applications**.
+
+> [!IMPORTANT]
+> The application is signed ad hoc, not with an Apple Developer ID, so macOS
+> blocks the first launch. Open **System Settings → Privacy & Security** and
+> select **Open Anyway**, or clear the mark from a terminal:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Termora.app
+> ```
+
+| Item | Value |
+| --- | --- |
+| macOS | 26.0 or later |
+| Hardware | Apple silicon |
+
+A push of a tag `v*` builds the application from GitHub Actions, publishes
+the release, and points the Homebrew cask at it.
+
+## Requirements to build
 
 - macOS 26 or later
 - Xcode 26 or later
 - XcodeGen (`brew install xcodegen`)
-
-## Install with Homebrew
-
-The repository is its own tap. The build is ad-hoc signed, so install with
-the flag that skips the quarantine:
-
-```sh
-brew tap fballiano/termora https://github.com/fballiano/termora
-brew install --cask --no-quarantine termora
-```
-
-A tag `v*` builds the release: the workflow in
-`.github/workflows/release.yml` compiles the application, attaches the zip
-to a GitHub release, and points `Casks/termora.rb` at it.
 
 ## Build
 
@@ -175,7 +229,7 @@ over the window rather than a panel beside it, so the terminal keeps the room.
 panes: this Mac on the left, the far host on the right. A copy is a drag from
 one side to the other.
 
-It It travels on
+It travels on
 the same control master as the terminal panes, so nothing authenticates twice,
 and closing the browser leaves every pane alone.
 

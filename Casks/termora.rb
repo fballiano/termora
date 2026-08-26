@@ -14,12 +14,9 @@ cask "termora" do
   app "Termora.app"
 
   caveats <<~EOS
-    Termora is ad-hoc signed, so macOS quarantines the download.
-    Install with the flag that skips the quarantine:
-
-      brew install --cask --no-quarantine termora
-
-    Or clear it after the install:
+    Termora is signed ad hoc, not with an Apple Developer ID, so macOS
+    blocks the first launch. Open System Settings -> Privacy & Security
+    and select Open Anyway, or clear the mark from a terminal:
 
       xattr -dr com.apple.quarantine /Applications/Termora.app
   EOS

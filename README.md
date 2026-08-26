@@ -281,9 +281,12 @@ a script or an AI agent use your bookmarks and your open connections, and it
 never sees a password: it sends one request to the running application over
 a private Unix socket, and the application does the rest.
 
-```bash
-alias termora=/Applications/Termora.app/Contents/MacOS/termora-cli
+A Homebrew install puts the command on your PATH as `termora`. Without
+Homebrew, `./run.sh --install` links it into `/usr/local/bin`, or you can
+call the binary in the bundle directly:
+`/Applications/Termora.app/Contents/MacOS/termora-cli`.
 
+```bash
 termora list                  # every bookmark, one per line
 termora status                # every open connection: name, state, tunnels
 termora run web1 -- uptime    # run a command on a bookmark
@@ -304,7 +307,7 @@ the request was refused; the reason is one line on standard error.
 One line for a project `CLAUDE.md`:
 
 ```
-`/Applications/Termora.app/Contents/MacOS/termora-cli run <bookmark> -- <command…>` runs a command on a saved SSH server; `… list` names the bookmarks.
+`termora run <bookmark> -- <command…>` runs a command on a saved SSH server; `termora list` names the bookmarks.
 ```
 
 ## Importing from Royal TSX

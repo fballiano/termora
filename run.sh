@@ -2,7 +2,8 @@
 # Builds Termora and starts it.
 #
 #   ./run.sh            build and start
-#   ./run.sh --install  also copy the application to /Applications
+#   ./run.sh --install  also copy the application to /Applications and
+#                       link the `termora` command into /usr/local/bin
 #
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -33,6 +34,14 @@ if [ "${1:-}" = "--install" ]; then
     rm -rf "/Applications/Termora.app"
     cp -R "$APP" "/Applications/Termora.app"
     APP="/Applications/Termora.app"
+
+    CLI="$APP/Contents/MacOS/termora-cli"
+    LINK="/usr/local/bin/termora"
+    if [ "$(readlink "$LINK" 2>/dev/null)" != "$CLI" ]; then
+        echo "==> Linking $LINK (asks for your password)"
+        sudo mkdir -p /usr/local/bin
+        sudo ln -sf "$CLI" "$LINK"
+    fi
 fi
 
 echo "==> Starting $APP"

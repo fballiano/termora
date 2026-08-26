@@ -12,6 +12,7 @@ cask "termora" do
   depends_on arch: :arm64
 
   app "Termora.app"
+  binary "#{appdir}/Termora.app/Contents/MacOS/termora-cli", target: "termora"
 
   caveats <<~EOS
     Termora is signed ad hoc, not with an Apple Developer ID, so macOS

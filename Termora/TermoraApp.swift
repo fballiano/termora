@@ -74,6 +74,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Saves the window frame under a name, and puts it back on the next launch.
+///
+/// SwiftUI's `WindowGroup` alone reopens at `defaultSize` whenever macOS
+/// does not restore the window itself, for example when the person closed
+/// the window before quitting. AppKit's frame autosave is deterministic:
+/// every move and resize goes to `UserDefaults`, and the saved frame is
+/// applied before the window is shown again.
+private struct WindowFrameAutosave: NSViewRepresentable {
+    let name: String
+
+    func makeNSView(context _: Context) -> NSView {
+        let view = NSView()
+        // The view has no window until it is in the hierarchy.
+        DispatchQueue.main.async {
+            guard let window = view.window else { return }
+            window.setFrameUsingName(name)
+            window.setFrameAutosaveName(name)
+        }
+        return view
+    }
+
+    func updateNSView(_: NSView, context _: Context) {}
+}
+
 @main
 struct TermoraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -108,6 +132,7 @@ struct TermoraApp: App {
                 .environmentObject(sessions)
                 .environmentObject(importer)
                 .onAppear { appDelegate.sessions = sessions }
+                .background(WindowFrameAutosave(name: "TermoraMainWindow"))
         }
         .defaultSize(width: 1250, height: 780)
         .commands {

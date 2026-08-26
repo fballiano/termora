@@ -84,13 +84,29 @@ private struct WindowShape: NSViewRepresentable {
             guard let window = view.window, applied != isCompact else { return }
             applied = isCompact
             if isCompact {
+                WindowMemory.isArmed = false
                 window.styleMask.remove(.resizable)
                 window.setContentSize(WindowShape.compactSize)
-            } else {
-                window.styleMask.insert(.resizable)
-                window.setContentSize(WindowShape.openSize)
+                window.center()
+                return
             }
-            window.center()
+
+            window.styleMask.insert(.resizable)
+            // Back to where the person left the window, not to a fixed
+            // size. `WindowMemory` skips the compact shape, so the saved
+            // frame is always an open one.
+            if let frame = WindowMemory.savedFrame {
+                window.setFrame(frame, display: true)
+            } else {
+                window.setContentSize(WindowShape.openSize)
+                window.center()
+            }
+            if WindowMemory.wasFullScreen,
+               !window.styleMask.contains(.fullScreen) {
+                window.toggleFullScreen(nil)
+            }
+            // From here on, moves and resizes are the person's own.
+            WindowMemory.isArmed = true
         }
     }
 }

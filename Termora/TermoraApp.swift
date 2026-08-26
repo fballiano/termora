@@ -6,6 +6,53 @@
 import AppKit
 import SwiftUI
 
+/// The main window's last frame and full-screen state, across launches.
+///
+/// SwiftUI's own frame autosave writes a key but never reads it back on
+/// this macOS, and the unlock flow reshapes the window anyway: `WindowShape`
+/// sets a fixed size when the document opens. So the memory is explicit.
+/// The delegate writes it on every move and resize, and `WindowShape` reads
+/// it when the window grows back after unlock.
+@MainActor
+enum WindowMemory {
+    private static let frameKey = "TermoraMainWindowFrame"
+    private static let wasFullScreenKey = "TermoraMainWindowWasFullScreen"
+
+    static var wasFullScreen: Bool {
+        get { UserDefaults.standard.bool(forKey: wasFullScreenKey) }
+        set { UserDefaults.standard.set(newValue, forKey: wasFullScreenKey) }
+    }
+
+    /// The saved frame, when there is one that still makes sense.
+    static var savedFrame: NSRect? {
+        guard let saved = UserDefaults.standard.string(forKey: frameKey) else {
+            return nil
+        }
+        let frame = NSRectFromString(saved)
+        return frame.isEmpty ? nil : frame
+    }
+
+    /// Armed by `WindowShape` once the open shape is applied. The window
+    /// exists briefly at `defaultSize` before the first shaping pass, and
+    /// a resize seen then must not overwrite the saved frame.
+    static var isArmed = false
+
+    /// Writes the window's frame, when it is one worth remembering.
+    ///
+    /// The compact unlock window is not resizable, so the check on
+    /// `.resizable` keeps its shape out of the memory. A full-screen frame
+    /// is not a size the person chose, so it is skipped too; the flag
+    /// remembers that state instead.
+    static func remember(_ window: NSWindow?) {
+        guard isArmed else { return }
+        guard let window,
+              window.collectionBehavior.contains(.fullScreenPrimary),
+              window.styleMask.contains(.resizable),
+              !window.styleMask.contains(.fullScreen) else { return }
+        UserDefaults.standard.set(NSStringFromRect(window.frame), forKey: frameKey)
+    }
+}
+
 /// Answers ⌘Q. With open sessions the person is asked first, and the
 /// connections close before the application goes.
 ///
@@ -22,6 +69,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private static let leftArrowKeyCode: UInt16 = 123
     private static let rightArrowKeyCode: UInt16 = 124
+
+    private var windowObservers: [NSObjectProtocol] = []
+    /// Leaving full screen as part of quitting must not clear the flag,
+    /// or the next launch opens windowed.
+    private var isTerminating = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Before the first window exists, so no change is missed.
+        observeWindowState()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -46,8 +103,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// The observers watch every window, because the SwiftUI window is not
+    /// reachable from here directly. `WindowMemory.remember` tells the
+    /// main open window apart from the unlock shape and from Settings.
+    private func observeWindowState() {
+        let center = NotificationCenter.default
+        for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
+            windowObservers.append(center.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { note in
+                // The queue is the main queue, so the window is on its
+                // actor; the notification itself is not Sendable and
+                // stays outside.
+                nonisolated(unsafe) let window = note.object as? NSWindow
+                MainActor.assumeIsolated {
+                    WindowMemory.remember(window)
+                }
+            })
+        }
+        windowObservers.append(center.addObserver(
+            forName: NSWindow.didEnterFullScreenNotification, object: nil, queue: .main
+        ) { note in
+            nonisolated(unsafe) let window = note.object as? NSWindow
+            MainActor.assumeIsolated {
+                guard let window,
+                      window.collectionBehavior.contains(.fullScreenPrimary) else { return }
+                WindowMemory.wasFullScreen = true
+            }
+        })
+        windowObservers.append(center.addObserver(
+            forName: NSWindow.didExitFullScreenNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            nonisolated(unsafe) let window = note.object as? NSWindow
+            MainActor.assumeIsolated {
+                guard let self, !self.isTerminating, let window,
+                      window.collectionBehavior.contains(.fullScreenPrimary) else { return }
+                WindowMemory.wasFullScreen = false
+            }
+        })
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication)
         -> NSApplication.TerminateReply {
+        isTerminating = true
         guard let sessions, !sessions.tabs.isEmpty else { return .terminateNow }
 
         if AppSettings.confirmQuit {
@@ -60,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "Quit")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else {
+                isTerminating = false
                 return .terminateCancel
             }
         }
@@ -72,68 +171,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return .terminateLater
     }
-}
-
-/// Saves the window frame and full-screen state under a name, and puts both
-/// back on the next launch.
-///
-/// SwiftUI's `WindowGroup` alone reopens at `defaultSize` whenever macOS
-/// does not restore the window itself, for example when the person closed
-/// the window before quitting. AppKit's frame autosave is deterministic:
-/// every move and resize goes to `UserDefaults`, and the saved frame is
-/// applied before the window is shown again. Full screen is a window state,
-/// not a frame, so the autosave does not carry it; the state is kept in a
-/// separate default and replayed with `toggleFullScreen`.
-private struct WindowStateAutosave: NSViewRepresentable {
-    let name: String
-
-    private var fullScreenKey: String { "\(name)WasFullScreen" }
-
-    final class Coordinator {
-        var observers: [NSObjectProtocol] = []
-        deinit { observers.forEach(NotificationCenter.default.removeObserver) }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        let fullScreenKey = fullScreenKey
-        let name = name
-        // The view has no window until it is in the hierarchy.
-        DispatchQueue.main.async { [weak coordinator = context.coordinator] in
-            guard let window = view.window, let coordinator else { return }
-            window.setFrameUsingName(name)
-            window.setFrameAutosaveName(name)
-
-            let defaults = UserDefaults.standard
-            if defaults.bool(forKey: fullScreenKey),
-               !window.styleMask.contains(.fullScreen) {
-                window.toggleFullScreen(nil)
-            }
-
-            // The state is written on every change, not read at quit: at
-            // quit the window may already be gone.
-            let center = NotificationCenter.default
-            coordinator.observers = [
-                center.addObserver(
-                    forName: NSWindow.didEnterFullScreenNotification,
-                    object: window, queue: .main
-                ) { _ in
-                    UserDefaults.standard.set(true, forKey: fullScreenKey)
-                },
-                center.addObserver(
-                    forName: NSWindow.didExitFullScreenNotification,
-                    object: window, queue: .main
-                ) { _ in
-                    UserDefaults.standard.set(false, forKey: fullScreenKey)
-                },
-            ]
-        }
-        return view
-    }
-
-    func updateNSView(_: NSView, context _: Context) {}
 }
 
 @main
@@ -170,7 +207,6 @@ struct TermoraApp: App {
                 .environmentObject(sessions)
                 .environmentObject(importer)
                 .onAppear { appDelegate.sessions = sessions }
-                .background(WindowStateAutosave(name: "TermoraMainWindow"))
         }
         .defaultSize(width: 1250, height: 780)
         .commands {

@@ -8,10 +8,43 @@ import SwiftUI
 
 /// Answers ⌘Q. With open sessions the person is asked first, and the
 /// connections close before the application goes.
+///
+/// It also holds ⌘⌥← and ⌘⌥→ for the tab walk. A menu item carries one
+/// key equivalent, and Next Tab already shows ⌘⇧], so the arrows come
+/// from an event monitor instead of a second, repeated menu item.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set by the application when the scene appears.
     var sessions: SessionsController?
+
+    /// The monitor lives as long as the application.
+    private var tabKeyMonitor: Any?
+
+    private static let leftArrowKeyCode: UInt16 = 123
+    private static let rightArrowKeyCode: UInt16 = 124
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        tabKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // An arrow key also raises `.function` and `.numericPad`, so the
+            // comparison drops them before it looks for ⌘⌥ alone.
+            let flags = event.modifierFlags
+                .intersection(.deviceIndependentFlagsMask)
+                .subtracting([.function, .numericPad])
+            guard flags == [.command, .option] else { return event }
+
+            let step: Int
+            switch event.keyCode {
+            case Self.leftArrowKeyCode: step = -1
+            case Self.rightArrowKeyCode: step = 1
+            default: return event
+            }
+
+            // The monitor runs on the main thread, but its closure carries no
+            // isolation, so the fact is asserted rather than assumed silently.
+            MainActor.assumeIsolated { self?.sessions?.selectRelativeTab(step) }
+            return nil
+        }
+    }
 
     func applicationShouldTerminate(_ sender: NSApplication)
         -> NSApplication.TerminateReply {

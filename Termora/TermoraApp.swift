@@ -180,11 +180,19 @@ struct TermoraApp: App {
                     .keyboardShortcut("[", modifiers: [.command, .shift])
                     .disabled(sessions.tabs.count < 2)
 
-                Divider()
+            }
 
+            // ⌘W must reach one item only. The system's own File, Close also
+            // answers ⌘W, the File menu is searched first, and the window
+            // then closes with every terminal in it. This group replaces the
+            // system items, so ⌘W closes a tab and ⇧⌘W closes the window,
+            // the way Terminal and Safari divide them.
+            CommandGroup(replacing: .saveItem) {
                 Button("Close Tab") { sessions.closeSelectedTab() }
                     .keyboardShortcut("w", modifiers: [.command])
                     .disabled(sessions.selectedTab == nil)
+                Button("Close Window") { NSApp.keyWindow?.performClose(nil) }
+                    .keyboardShortcut("w", modifiers: [.command, .shift])
             }
 
             CommandGroup(after: .newItem) {

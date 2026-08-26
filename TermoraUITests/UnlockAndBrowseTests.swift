@@ -202,5 +202,19 @@ final class UnlockAndBrowseTests: XCTestCase {
                       "The tab must be drawn, not laid out with no size.")
         XCTAssertFalse(main.staticTexts["No session"].exists,
                        "The detail area must show the tab now.")
+
+        // ⌘W closes the tab and leaves the window. The system's own File,
+        // Close once answered ⌘W first and took every session with it.
+        app.typeKey("w", modifierFlags: [.command])
+        let gone = expectation(for: NSPredicate(format: "exists == false"),
+                               evaluatedWith: tab)
+        wait(for: [gone], timeout: 10)
+        XCTAssertTrue(main.exists, "⌘W must not close the window.")
+        XCTAssertTrue(main.staticTexts["No session"].waitForExistence(timeout: 5),
+                      "With the last tab closed the detail area says so.")
+
+        // With no tab open, ⌘W does nothing at all.
+        app.typeKey("w", modifierFlags: [.command])
+        XCTAssertTrue(main.exists, "⌘W with no tab must not close the window.")
     }
 }

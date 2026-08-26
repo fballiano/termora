@@ -1,7 +1,7 @@
 # The release workflow rewrites `version` and `sha256` on every tag.
 cask "termora" do
-  version "0.2.3"
-  sha256 "e6b9987c419117d09dbb587e7225a41f74bcb5e149812c5eac8b0fff4d01f930"
+  version "0.2.4"
+  sha256 "bccb894112199983ee14c398da28e8a1c07c29c1ca510e5d6bb981a65c102e54"
 
   url "https://github.com/fballiano/termora/releases/download/v#{version}/Termora-#{version}.zip"
   name "Termora"

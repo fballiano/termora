@@ -195,6 +195,29 @@ final class SSHIntegrationTests {
         await engine.disconnect(id: id)
     }
 
+    @Test("A command from the `termora` tool runs over the master, and its exit code comes back")
+    func agentCommandRunsOverTheMaster() async throws {
+        let id = UUID()
+        let connection = await engine.connect(
+            id: id, name: "test", target: target(keyPath: server.plainKeyPath, passphrase: "")
+        )
+        #expect(connection.state == .connected, "The master must connect. Log: \(connection.log)")
+
+        // The tool executes exactly this argv. A word with a space must
+        // arrive at the far shell as one word.
+        let argv = connection.commandArguments(["echo", "one word"])
+        let result = await ProcessRunner.run(argv[0], Array(argv.dropFirst()))
+        #expect(result.succeeded, "The command failed: \(result.errorOutput)")
+        #expect(result.output.contains("one word"))
+
+        // OpenSSH hands the far exit code back, and the tool exits with it.
+        let failing = connection.commandArguments(["sh", "-c", "exit 7"])
+        let failure = await ProcessRunner.run(failing[0], Array(failing.dropFirst()))
+        #expect(failure.status == 7)
+
+        await engine.disconnect(id: id)
+    }
+
     @Test("The SFTP subsystem answers on the same connection")
     func sftpSubsystemOpens() async throws {
         let id = UUID()

@@ -317,6 +317,70 @@ final class SessionsController: ObservableObject {
         }
     }
 
+    // MARK: - Agent access
+
+    /// Every open connection, for `termora status`.
+    var liveConnections: [SSHConnection] {
+        guard let engineStorage else { return [] }
+        return engineStorage.connections.values.sorted { $0.name < $1.name }
+    }
+
+    /// What `agentConnect` produced. A refusal carries the words the tool
+    /// prints on standard error.
+    enum AgentConnectOutcome {
+        case success(SSHConnection)
+        case failure(String)
+    }
+
+    /// Opens or reuses the control master for the `termora` tool, without a
+    /// tab. When OpenSSH must ask, the askpass sheet appears here in the
+    /// application, and the tool waits.
+    func agentConnect(connection: Connection) async -> AgentConnectOutcome {
+        guard let engine else {
+            return .failure(engineError ?? "The SSH engine did not start.")
+        }
+        guard !connection.host.isEmpty else {
+            return .failure("\(connection.name) has no host name.")
+        }
+        engine.connectTimeout = .seconds(AppSettings.connectTimeoutSeconds)
+        let settings = store.index.effectiveSettings(
+            for: connection, fallback: AppSettings.connectionFallback
+        )
+
+        // The command before connecting belongs to a fresh connection only.
+        // A live master was already paid for, command included.
+        let alreadyOpen = engine.connection(for: connection.id)?.isConnected ?? false
+        if !alreadyOpen, !settings.beforeConnect.isEmpty {
+            let outcome = await LocalCommandRunner.run(
+                settings.beforeConnect,
+                values: CommandPlaceholders.Values(
+                    host: connection.host,
+                    port: connection.port,
+                    username: settings.username,
+                    name: connection.name
+                ),
+                onOutput: { _ in }
+            )
+            if let problem = outcome.problem {
+                return .failure("\(settings.beforeConnect.name): \(problem)")
+            }
+        }
+
+        let target = SSHTarget(host: connection.host, port: connection.port, settings: settings)
+        let sshConnection = await engine.connect(
+            id: connection.id, name: connection.name, target: target
+        )
+        switch sshConnection.state {
+        case .connected:
+            if !alreadyOpen { await startForwards(of: connection, on: sshConnection) }
+            return .success(sshConnection)
+        case let .failed(reason):
+            return .failure(reason)
+        default:
+            return .failure("The connection did not open.")
+        }
+    }
+
     // MARK: - Tunnels on a live connection
 
     /// True when the connection is open, so its tunnels can be changed now.

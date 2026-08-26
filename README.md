@@ -36,6 +36,7 @@ engine through libghostty, and it drives the OpenSSH of macOS, so your
 <tr><td><b>One encrypted file</b></td><td>AES-256-GCM behind a master password. Put it wherever you sync your files.</td></tr>
 <tr><td><b>Touch ID</b></td><td>The key can rest in the Secure Enclave, so unlock is one touch. The password still works anywhere.</td></tr>
 <tr><td><b>Royal TSX import</b></td><td>Folders, connections, tasks and saved passwords come across, with a report of everything that did not.</td></tr>
+<tr><td><b>Agent ready</b></td><td>A bundled <code>termora</code> CLI lets a script or an AI agent list bookmarks and run commands over your connections. No secret ever reaches the tool.</td></tr>
 </table>
 
 ## Install
@@ -272,6 +273,39 @@ connection attempt, and prints the answer it receives.
 `Packages/TermoraSSH/Sources/TermoraSSH/AskpassClient.swift` are compiled into
 both the helper and the library, so the tool and the tests can never speak
 different versions of the protocol.
+
+## Driving Termora from an agent or a script
+
+The application bundle carries a small command-line tool, `termora`. It lets
+a script or an AI agent use your bookmarks and your open connections, and it
+never sees a password: it sends one request to the running application over
+a private Unix socket, and the application does the rest.
+
+```bash
+alias termora=/Applications/Termora.app/Contents/MacOS/termora
+
+termora list                  # every bookmark, one per line
+termora status                # every open connection: name, state, tunnels
+termora run web1 -- uptime    # run a command on a bookmark
+```
+
+`run` opens the connection when it is closed, through the same path as a
+double click: the askpass sheet appears in Termora when OpenSSH must ask,
+and the tool waits. The command then rides the control master, output
+streams through as it arrives, and the far exit code becomes the exit code
+of `termora`. Output is data only, one line per item, so it reads well from
+a script and costs an agent few tokens.
+
+The socket answers only while a document is open. Locking the document stops
+the service, so a locked document gives away nothing, not even the names.
+Exit code 2 means the application is not running, the document is locked, or
+the request was refused; the reason is one line on standard error.
+
+One line for a project `CLAUDE.md`:
+
+```
+`/Applications/Termora.app/Contents/MacOS/termora run <bookmark> -- <command…>` runs a command on a saved SSH server; `… list` names the bookmarks.
+```
 
 ## Importing from Royal TSX
 

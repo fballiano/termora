@@ -172,6 +172,19 @@ public final class SSHConnection: ObservableObject, Identifiable {
         SSHCommand.sftpSubsystem(target: target, controlPath: controlPath)
     }
 
+    /// The argv that runs one command on this connection and then returns.
+    /// The `termora` tool executes it, so the far output streams natively
+    /// and the far exit code becomes the tool's own.
+    ///
+    /// The words are quoted into one line for the far shell. OpenSSH would
+    /// otherwise join them with plain spaces, and the far shell would split
+    /// a word such as `a b` back into two.
+    public func commandArguments(_ words: [String]) -> [String] {
+        [SSHCommand.executable]
+            + SSHCommand.session(target: target, controlPath: controlPath)
+            + [POSIXQuote.line(words)]
+    }
+
     @discardableResult
     public func addForward(_ forward: PortForward) async -> CommandResult {
         let result = await runControlCommand(

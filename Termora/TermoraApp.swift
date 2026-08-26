@@ -48,6 +48,7 @@ struct TermoraApp: App {
     @StateObject private var sessions: SessionsController
     @StateObject private var importer: ImportController
     @StateObject private var autoLock: AutoLockController
+    @StateObject private var agentGateway: AgentGateway
 
     init() {
         // Before anything reads a setting, so every reader sees one default.
@@ -61,6 +62,9 @@ struct TermoraApp: App {
         })
         _autoLock = StateObject(wrappedValue: MainActor.assumeIsolated {
             AutoLockController(store: store, sessions: sessions)
+        })
+        _agentGateway = StateObject(wrappedValue: MainActor.assumeIsolated {
+            AgentGateway(store: store, sessions: sessions)
         })
     }
 

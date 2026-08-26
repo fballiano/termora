@@ -297,7 +297,10 @@ private struct TerminalPaneView: View {
             .contentShape(Rectangle())
             .onTapGesture { sessions.focus(paneID: session.id, in: tab) }
             .onAppear {
-                if isFocused { session.focus() }
+                // Only a pane on the chosen tab may take the keyboard. A
+                // session that becomes ready behind another tab appears too,
+                // and it must not steal the keys from what you are typing in.
+                if isFocused, sessions.selectedTabID == tab.id { session.focus() }
             }
     }
 }

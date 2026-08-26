@@ -51,3 +51,31 @@ Files touched:
 
 - `Sources/GhosttyTerminal/Controller/TerminalController.swift`
 - `Sources/GhosttyTerminal/Surface/TerminalSurfaceCoordinator.swift`
+
+## The second bug: `isSurfaceVisible` lost behind a hidden tab
+
+`TerminalViewState.isSurfaceVisible` reached the platform view only through
+the SwiftUI representable's update pass. SwiftUI (macOS 26) does not
+reliably run that pass for a representable whose ancestor sits at
+`opacity(0)` — exactly how a host keeps hidden tabs mounted.
+
+A surface built behind a hidden tab was therefore born occluded and never
+heard `setSurfaceVisible(true)` when its tab was chosen. In Termora that
+showed as a tab that connected while another tab was in front and then
+stayed a blank pane for ever. The visible tab had the mirror image: its
+`false` was also lost, so it kept rendering behind the tab in front.
+
+## The change
+
+`isSurfaceVisible` now has a `didSet` that pushes the new value to
+`attachedView` imperatively, keeping `hostDeclaredDisplayVisible` in step.
+The representable's own stamping remains, for a view that attaches after
+the state was already set.
+
+Files touched:
+
+- `Sources/GhosttyTerminal/State/TerminalViewState.swift`
+
+The regression test is in the application repository:
+`TermoraUITests/TabSwitchDuringConnectTests.swift`, run through
+`Scripts/uitest-ssh.sh`.

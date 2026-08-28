@@ -55,7 +55,13 @@ race with the remote prompt.
 The addition: a public `TerminalKeyPress` enum and
 `TerminalViewState.sendKey(_:)` /
 `TerminalSurface.sendKeyPress(_:)`, which send a real key event through
-`ghostty_surface_key`. Key events are never paste-framed.
+`ghostty_surface_key`. Key events are never paste-framed. The release
+follows the press, so a program on the kitty keyboard protocol never
+sees a key held down for ever.
+
+This change is proposed upstream as
+[Lakr233/libghostty-spm#51](https://github.com/Lakr233/libghostty-spm/pull/51).
+If it is merged and released, take that release and drop this section.
 
 Files touched:
 

@@ -12,7 +12,7 @@ import GhosttyKit
 /// as a paste: a shell then inserts a pasted `\r` into its edit line instead
 /// of running the line. A key event is never framed, so a programmatic
 /// Enter always acts as the Enter key.
-public enum TerminalKeyPress: Sendable {
+public enum TerminalKeyPress: Sendable, CaseIterable {
     case enter
     case tab
     case escape
@@ -37,12 +37,22 @@ public enum TerminalKeyPress: Sendable {
 }
 
 extension TerminalSurface {
-    /// Presses one named key, as if it was typed on the keyboard.
+    /// Presses and releases one named key, as if it was typed.
+    ///
+    /// The release follows the press so the synthetic tap matches a real
+    /// one in every protocol mode: a program that asked for key-event
+    /// reporting (the kitty keyboard protocol) receives both, and must not
+    /// be left seeing a key held down for ever. In the legacy encoding the
+    /// release sends nothing, so it costs nothing there.
     @discardableResult
     public func sendKeyPress(_ key: TerminalKeyPress) -> Bool {
         var event = ghostty_input_key_s()
-        event.action = GHOSTTY_ACTION_PRESS
         event.keycode = TerminalHardwareKeyRouter.appKitKeyCode(for: key.ghosttyKey)
-        return sendKeyEvent(event)
+
+        event.action = GHOSTTY_ACTION_PRESS
+        let pressed = sendKeyEvent(event)
+        event.action = GHOSTTY_ACTION_RELEASE
+        _ = sendKeyEvent(event)
+        return pressed
     }
 }

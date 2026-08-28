@@ -114,10 +114,7 @@ public final class TerminalViewState: ObservableObject {
     }
 
     /// Presses one named key on the attached surface, as if it was typed.
-    ///
-    /// Use this instead of ``send(_:)`` for keys such as Enter: text goes
-    /// through the paste path, and a shell with bracketed paste on inserts
-    /// a pasted `\r` instead of running the line.
+    /// Unlike ``send(_:)``, a key press is never paste-framed.
     @discardableResult
     public func sendKey(_ key: TerminalKeyPress) -> Bool {
         guard let surface else {

@@ -3,6 +3,7 @@
 //  Termora
 //
 
+import AppKit
 import GhosttyTerminal
 import SwiftUI
 import TermoraModel
@@ -46,7 +47,13 @@ struct TerminalTabsView: View {
         }
         .onChange(of: sessions.selectedTabID) { _, _ in
             sessions.updateVisibility()
-            sessions.selectedTab?.panes.first { $0.id == sessions.selectedTab?.focusedPaneID }?.focus()
+            if let pane = sessions.selectedTab?.panes
+                .first(where: { $0.id == sessions.selectedTab?.focusedPaneID }) {
+                pane.focus()
+            } else {
+                // A focused hidden surface would answer ⌘W for another tab.
+                NSApp.keyWindow?.makeFirstResponder(nil)
+            }
         }
     }
 }

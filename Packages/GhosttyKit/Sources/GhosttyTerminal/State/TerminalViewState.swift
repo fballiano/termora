@@ -45,9 +45,7 @@ public final class TerminalViewState: ObservableObject {
     /// sees. Defaults to true.
     @Published public var isSurfaceVisible: Bool = true {
         didSet {
-            // Pushed directly as well: SwiftUI can skip the representable's
-            // update pass under an `opacity(0)` ancestor (seen on macOS 26),
-            // and the flag then never reaches the view.
+            // SwiftUI can skip the update pass under an `opacity(0)` ancestor.
             guard oldValue != isSurfaceVisible, let view = attachedView else { return }
             view.core.hostDeclaredDisplayVisible = isSurfaceVisible
             view.setSurfaceVisible(isSurfaceVisible)

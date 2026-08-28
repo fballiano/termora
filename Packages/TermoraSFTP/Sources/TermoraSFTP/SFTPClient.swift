@@ -21,8 +21,15 @@ public actor SFTPClient {
     public static let transferWindow = 8
 
     private let transport: any SFTPTransport
+    /// How long one request may wait for its reply. A server that stops
+    /// answering must not hold the browser busy for ever.
+    private let requestTimeout: Duration
     private var nextRequestID: UInt32 = 1
     private var waiting: [UInt32: CheckedContinuation<SFTPReply, any Error>] = [:]
+    /// One timer per request in flight. The reply cancels it; the timer fails
+    /// the request when no reply comes.
+    private var watchdogs: [UInt32: Task<Void, Never>] = [:]
+    private var versionWatchdog: Task<Void, Never>?
     private var incoming = Data()
     private var isClosed = false
     private var versionWaiter: CheckedContinuation<UInt32, any Error>?
@@ -36,8 +43,9 @@ public actor SFTPClient {
         case attributes(SFTPAttributes)
     }
 
-    public init(transport: any SFTPTransport) {
+    public init(transport: any SFTPTransport, requestTimeout: Duration = .seconds(30)) {
         self.transport = transport
+        self.requestTimeout = requestTimeout
     }
 
     // MARK: - Opening and closing
@@ -57,6 +65,7 @@ public actor SFTPClient {
 
         let agreed = try await withCheckedThrowingContinuation { continuation in
             versionWaiter = continuation
+            versionWatchdog = makeWatchdog { $0.versionTimedOut() }
         }
         guard agreed >= 3 else { throw SFTPError.unsupportedVersion(agreed) }
     }
@@ -156,12 +165,15 @@ public actor SFTPClient {
 
         var offset: UInt64 = 0
         while true {
-            let reply = try? await send(.read, path: remotePath) {
+            // A failed read is thrown, never treated as the end of the file:
+            // a dropped channel must not leave a shortened copy that looks
+            // complete. The end of the file arrives as a status, not as data.
+            let reply = try await send(.read, path: remotePath) {
                 $0.write(handle)
                 $0.write(offset)
                 $0.write(UInt32(Self.blockSize))
             }
-            guard let reply, case let .data(chunk) = reply, !chunk.isEmpty else { break }
+            guard case let .data(chunk) = reply, !chunk.isEmpty else { break }
 
             try file.write(contentsOf: chunk)
             offset += UInt64(chunk.count)
@@ -263,11 +275,43 @@ public actor SFTPClient {
             waiting[id] = continuation
             do {
                 try transport.send(packet)
+                watchdogs[id] = makeWatchdog { $0.requestTimedOut(id) }
             } catch {
                 waiting[id] = nil
                 continuation.resume(throwing: error)
             }
         }
+    }
+
+    // MARK: - Timing out
+
+    /// A task that calls back after `requestTimeout`, unless it is cancelled
+    /// first because the reply arrived.
+    private func makeWatchdog(
+        _ expire: @escaping @Sendable (isolated SFTPClient) async -> Void
+    ) -> Task<Void, Never> {
+        Task { [weak self, requestTimeout] in
+            try? await Task.sleep(for: requestTimeout)
+            guard !Task.isCancelled, let self else { return }
+            await expire(self)
+        }
+    }
+
+    private func requestTimedOut(_ id: UInt32) {
+        watchdogs[id] = nil
+        guard let continuation = waiting.removeValue(forKey: id) else { return }
+        continuation.resume(throwing: SFTPError.timedOut(
+            "No answer came in \(requestTimeout.components.seconds) seconds."
+        ))
+    }
+
+    private func versionTimedOut() {
+        versionWatchdog = nil
+        guard let continuation = versionWaiter else { return }
+        versionWaiter = nil
+        continuation.resume(throwing: SFTPError.timedOut(
+            "No answer came in \(requestTimeout.components.seconds) seconds."
+        ))
     }
 
     // MARK: - Receiving
@@ -299,6 +343,8 @@ public actor SFTPClient {
 
         if type == .version {
             let agreed = (try? reader.readUInt32()) ?? 0
+            versionWatchdog?.cancel()
+            versionWatchdog = nil
             versionWaiter?.resume(returning: agreed)
             versionWaiter = nil
             return
@@ -307,6 +353,7 @@ public actor SFTPClient {
         guard let id = try? reader.readUInt32(),
               let continuation = waiting.removeValue(forKey: id)
         else { return }
+        watchdogs.removeValue(forKey: id)?.cancel()
 
         do {
             continuation.resume(returning: try parse(type, &reader))
@@ -360,8 +407,12 @@ public actor SFTPClient {
     }
 
     private func failEveryWaiter(with error: any Error) {
+        versionWatchdog?.cancel()
+        versionWatchdog = nil
         versionWaiter?.resume(throwing: error)
         versionWaiter = nil
+        for watchdog in watchdogs.values { watchdog.cancel() }
+        watchdogs.removeAll()
         for continuation in waiting.values { continuation.resume(throwing: error) }
         waiting.removeAll()
     }

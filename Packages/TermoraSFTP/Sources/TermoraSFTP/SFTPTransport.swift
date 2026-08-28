@@ -30,11 +30,17 @@ public final class SFTPProcessTransport: SFTPTransport, @unchecked Sendable {
     private let input = Pipe()
     private let output = Pipe()
     private let errorPipe = Pipe()
+    /// What ssh wrote to standard error. It says why a channel failed, and
+    /// draining the pipe keeps a chatty ssh from blocking on a full buffer.
+    private let errorBuffer = BoundedTextBuffer()
 
     public init(executable: String, arguments: [String]) {
         self.executable = executable
         self.arguments = arguments
     }
+
+    /// The last of what ssh wrote to standard error, for an error message.
+    public var errorOutput: String { errorBuffer.text }
 
     public func start(onData: @escaping @Sendable (Data) -> Void,
                       onClose: @escaping @Sendable () -> Void) throws {
@@ -53,6 +59,15 @@ public final class SFTPProcessTransport: SFTPTransport, @unchecked Sendable {
                 onData(data)
             }
         }
+        let errors = errorBuffer
+        errorPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+            } else {
+                errors.append(String(decoding: data, as: UTF8.self))
+            }
+        }
         process.terminationHandler = { _ in onClose() }
 
         try process.run()
@@ -65,7 +80,27 @@ public final class SFTPProcessTransport: SFTPTransport, @unchecked Sendable {
 
     public func stop() {
         output.fileHandleForReading.readabilityHandler = nil
+        errorPipe.fileHandleForReading.readabilityHandler = nil
         try? input.fileHandleForWriting.close()
         if process.isRunning { process.terminate() }
+    }
+}
+
+/// Text that several threads may append to. Only the newest part is kept,
+/// so a talkative `ssh -v` cannot grow it without limit.
+private final class BoundedTextBuffer: @unchecked Sendable {
+    private static let capacity = 16 * 1024
+    private let lock = NSLock()
+    private var storage = ""
+
+    var text: String { lock.withLock { storage } }
+
+    func append(_ piece: String) {
+        lock.withLock {
+            storage += piece
+            if storage.count > Self.capacity {
+                storage = String(storage.suffix(Self.capacity))
+            }
+        }
     }
 }

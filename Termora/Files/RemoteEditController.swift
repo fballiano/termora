@@ -89,11 +89,10 @@ final class RemoteEditController: ObservableObject {
     func edit(_ entry: SFTPEntry, on connection: SSHConnection, with application: URL?) {
         guard !entry.isDirectory, !entry.isSymbolicLink else { return }
 
-        // The same file again only brings the editor forward.
         if let existing = edits.first(where: {
             $0.connection.id == connection.id && $0.remotePath == entry.path
         }) {
-            openInEditor(existing, with: application)
+            Task { await reopen(existing, with: application) }
             return
         }
 
@@ -124,6 +123,35 @@ final class RemoteEditController: ObservableObject {
             errorMessage = "Termora could not open \(edit.name) for editing. "
                 + error.localizedDescription
         }
+    }
+
+    /// Reopens an edit that already exists. The far file may have changed
+    /// since the copy was taken, so the copy is refreshed first.
+    private func reopen(_ edit: RemoteEdit, with application: URL?) async {
+        do {
+            let remote = try await withChannel(on: edit.connection) {
+                try await $0.stat(edit.remotePath).modifiedAt
+            }
+            if let remote, remote != edit.remoteModifiedAt {
+                if localChangeDate(of: edit) != edit.localModifiedAt {
+                    // Both sides changed. The person decides which one wins.
+                    conflicted = edit
+                } else {
+                    edit.activity = .downloading
+                    try await withChannel(on: edit.connection) { client in
+                        try await client.download(edit.remotePath, to: edit.localURL)
+                    }
+                    edit.remoteModifiedAt = remote
+                    edit.localModifiedAt = localChangeDate(of: edit)
+                    edit.activity = .idle
+                }
+            }
+        } catch {
+            edit.activity = .failed(error.localizedDescription)
+            errorMessage = "Termora could not check \(edit.name) on "
+                + "\(edit.connection.name). \(error.localizedDescription)"
+        }
+        openInEditor(edit, with: application)
     }
 
     private func openInEditor(_ edit: RemoteEdit, with application: URL?) {

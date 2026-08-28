@@ -43,15 +43,11 @@ public final class TerminalViewState: ObservableObject {
     /// scrollback, and session — only rendering stops and the display link
     /// is released, instead of every mounted tab drawing frames nobody
     /// sees. Defaults to true.
-    ///
-    /// The change is pushed to the attached view imperatively, not only
-    /// through the SwiftUI representable. SwiftUI (macOS 26) does not
-    /// reliably run an update pass for a representable whose ancestor sits
-    /// at `opacity(0)`: a surface built behind a hidden tab then never
-    /// hears `setSurfaceVisible(true)` when its tab is chosen, stays
-    /// occluded, and shows as a permanently blank pane.
     @Published public var isSurfaceVisible: Bool = true {
         didSet {
+            // Pushed directly as well: SwiftUI can skip the representable's
+            // update pass under an `opacity(0)` ancestor (seen on macOS 26),
+            // and the flag then never reaches the view.
             guard oldValue != isSurfaceVisible, let view = attachedView else { return }
             view.core.hostDeclaredDisplayVisible = isSurfaceVisible
             view.setSurfaceVisible(isSurfaceVisible)

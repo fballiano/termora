@@ -38,6 +38,10 @@ Files touched:
 
 - `Sources/GhosttyTerminal/State/TerminalViewState.swift`
 
+This change is proposed upstream as
+[Lakr233/libghostty-spm#52](https://github.com/Lakr233/libghostty-spm/pull/52).
+If it is merged and released, take that release and drop this section.
+
 The regression test is in the application repository:
 `TermoraUITests/TabSwitchDuringConnectTests.swift`, run through
 `Scripts/uitest-ssh.sh`.

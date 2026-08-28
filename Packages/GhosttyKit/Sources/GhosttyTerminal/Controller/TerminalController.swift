@@ -56,11 +56,8 @@ public final class TerminalController {
     var renderedConfigContents: String = TerminalController.defaultRenderedConfig
 
     public internal(set) var lastConfigurationIssue: String?
-    /// One surface's interest in a wakeup.
-    ///
-    /// Every surface shares this controller, so a single handler is not
-    /// enough: a new surface would write over the old one, and closing any
-    /// surface would leave none at all. See `FORK.md`.
+    /// One surface's interest in a wakeup. Every surface shares this
+    /// controller, so a single handler is not enough.
     struct WakeupObserver {
         let shouldProcess: () -> Bool
         let onWakeup: () -> Void
@@ -310,9 +307,7 @@ public final class TerminalController {
 
     func handleWakeup() {
         let observers = Array(wakeupObservers.values)
-        // Tick while at least one surface still wants it. One detached
-        // surface must not stop the application mailbox draining for the
-        // others.
+        // One detached surface must not stop the tick for the others.
         guard observers.isEmpty || observers.contains(where: { $0.shouldProcess() }) else {
             TerminalDebugLog.log(.lifecycle, "wakeup suspended")
             return

@@ -506,8 +506,6 @@ final class TerminalSurfaceCoordinator {
         if let session = configuration.inMemorySession {
             session.clearSurface(ifMatches: surface?.rawValue)
         }
-        // Remove only this surface's interest. Clearing the controller's
-        // handler would stop every other surface drawing. See `FORK.md`.
         controller?.removeWakeupObserver(ObjectIdentifier(self))
         bridge.rawSurface = nil
         let hadSurface = surface != nil

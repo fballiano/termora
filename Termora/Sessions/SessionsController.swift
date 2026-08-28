@@ -120,6 +120,13 @@ final class PromptRequest: Identifiable, ObservableObject {
     }
 }
 
+/// A pane that asked to close while its program still runs. The view asks
+/// before the pane goes.
+struct PaneCloseRequest: Identifiable {
+    let paneID: UUID
+    var id: UUID { paneID }
+}
+
 /// Owns the tabs, the panes, and the SSH engine.
 @MainActor
 final class SessionsController: ObservableObject {
@@ -127,6 +134,11 @@ final class SessionsController: ObservableObject {
     @Published var selectedTabID: UUID?
     @Published var pendingPrompt: PromptRequest?
     @Published var errorMessage: String?
+    @Published var paneCloseRequest: PaneCloseRequest?
+
+    /// The remote files open in editors on this Mac. The controller outlives
+    /// every browser view, because an editor stays open after its tab closes.
+    let remoteEdits = RemoteEditController()
 
     private let store: DocumentStore
     private var engineStorage: SSHEngine?
@@ -291,7 +303,11 @@ final class SessionsController: ObservableObject {
                     updateVisibility()
                     await typeAfterConnect(settings.afterConnectText, into: session)
                 case .files:
-                    tab.browser = FileBrowserModel(sshConnection: sshConnection)
+                    let browser = FileBrowserModel(sshConnection: sshConnection)
+                    browser.onEdit = { [weak self] entry, application in
+                        self?.remoteEdits.edit(entry, on: sshConnection, with: application)
+                    }
+                    tab.browser = browser
                     tab.phase = .ready
                     tabPhaseChanged()
                 }
@@ -461,8 +477,14 @@ final class SessionsController: ObservableObject {
             waitAfterCommand: true,
             title: title
         ))
-        session.onRequestClose = { [weak self] session, _ in
-            self?.close(paneID: session.id)
+        session.onRequestClose = { [weak self] session, processAlive in
+            // A pane whose program still runs is not closed on the spot: the
+            // view asks first. A finished pane goes at once.
+            if processAlive {
+                self?.paneCloseRequest = PaneCloseRequest(paneID: session.id)
+            } else {
+                self?.close(paneID: session.id)
+            }
         }
         return session
     }
@@ -523,9 +545,11 @@ final class SessionsController: ObservableObject {
         let tab = tabs.remove(at: index)
         tab.browser?.close()
 
-        // Close the connection when no other tab is using it.
+        // Close the connection when no other tab is using it. Its edits end
+        // too: with the master gone, a save could never be copied back.
         let stillUsed = tabs.contains { $0.connectionID == tab.connectionID }
         if !stillUsed, let engineStorage {
+            remoteEdits.connectionClosed(tab.connectionID)
             Task { await engineStorage.disconnect(id: tab.connectionID) }
         }
 
@@ -550,6 +574,7 @@ final class SessionsController: ObservableObject {
     }
 
     func disconnectEverything() async {
+        remoteEdits.endAll()
         await engineStorage?.disconnectAll()
     }
 }

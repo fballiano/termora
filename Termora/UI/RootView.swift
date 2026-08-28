@@ -10,6 +10,7 @@ struct RootView: View {
     @EnvironmentObject private var store: DocumentStore
     @EnvironmentObject private var sessions: SessionsController
     @EnvironmentObject private var importer: ImportController
+    @EnvironmentObject private var remoteEdits: RemoteEditController
 
     var body: some View {
         Group {
@@ -25,11 +26,15 @@ struct RootView: View {
         .alert(
             "Termora",
             isPresented: Binding(
-                get: { store.errorMessage != nil || sessions.errorMessage != nil },
+                get: {
+                    store.errorMessage != nil || sessions.errorMessage != nil
+                        || remoteEdits.errorMessage != nil
+                },
                 set: { showing in
                     if !showing {
                         store.errorMessage = nil
                         sessions.errorMessage = nil
+                        remoteEdits.errorMessage = nil
                     }
                 }
             )
@@ -37,9 +42,51 @@ struct RootView: View {
             Button("OK", role: .cancel) {
                 store.errorMessage = nil
                 sessions.errorMessage = nil
+                remoteEdits.errorMessage = nil
             }
         } message: {
-            Text(store.errorMessage ?? sessions.errorMessage ?? "")
+            Text(store.errorMessage ?? sessions.errorMessage ?? remoteEdits.errorMessage ?? "")
+        }
+        // A pane whose program still runs asked to close. Nothing closed yet.
+        .confirmationDialog(
+            "Close this pane?",
+            isPresented: Binding(
+                get: { sessions.paneCloseRequest != nil },
+                set: { if !$0 { sessions.paneCloseRequest = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Close", role: .destructive) {
+                if let request = sessions.paneCloseRequest {
+                    sessions.close(paneID: request.paneID)
+                }
+                sessions.paneCloseRequest = nil
+            }
+            Button("Cancel", role: .cancel) { sessions.paneCloseRequest = nil }
+        } message: {
+            Text("A program still runs in it.")
+        }
+        // The remote file changed while it was open in an editor here. The
+        // save is not copied back until you answer.
+        .confirmationDialog(
+            "Overwrite \(remoteEdits.conflicted?.name ?? "the file") on the far host?",
+            isPresented: Binding(
+                get: { remoteEdits.conflicted != nil },
+                set: { if !$0 { remoteEdits.conflicted = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Overwrite", role: .destructive) {
+                if let edit = remoteEdits.conflicted {
+                    remoteEdits.conflicted = nil
+                    Task { await remoteEdits.upload(edit, force: true) }
+                }
+            }
+            Button("Cancel", role: .cancel) { remoteEdits.conflicted = nil }
+        } message: {
+            Text("The file changed on the far host after Termora copied it. "
+                + "Overwrite replaces those changes with your saved copy. "
+                + "Cancel keeps both files as they are; the next save asks again.")
         }
         // OpenSSH is waiting for this answer, so the sheet always answers,
         // even when it is dismissed.

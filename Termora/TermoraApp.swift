@@ -206,6 +206,7 @@ struct TermoraApp: App {
                 .environmentObject(store)
                 .environmentObject(sessions)
                 .environmentObject(importer)
+                .environmentObject(sessions.remoteEdits)
                 .onAppear { appDelegate.sessions = sessions }
         }
         .defaultSize(width: 1250, height: 780)

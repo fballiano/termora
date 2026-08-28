@@ -3,9 +3,11 @@
 //  Termora
 //
 
+import AppKit
 import SwiftUI
 import TermoraModel
 import TermoraVault
+import UniformTypeIdentifiers
 
 /// The Settings window (⌘,): General, Security, Connections.
 struct SettingsView: View {
@@ -27,13 +29,47 @@ struct SettingsView: View {
 private struct GeneralSettingsTab: View {
     @AppStorage(AppSettings.confirmQuitKey) private var confirmQuit = true
     @AppStorage(AppSettings.openLastDocumentKey) private var opensLastDocument = true
+    @AppStorage(AppSettings.remoteEditorPathKey) private var remoteEditorPath = ""
 
     var body: some View {
         Form {
             Toggle("Ask before quitting while connections are open", isOn: $confirmQuit)
             Toggle("Open the last document at launch", isOn: $opensLastDocument)
+
+            Section {
+                LabeledContent("Edit remote files with") {
+                    HStack(spacing: 8) {
+                        Text(editorName)
+                            .foregroundStyle(.secondary)
+                        Button("Choose…") { chooseEditor() }
+                        if !remoteEditorPath.isEmpty {
+                            Button("Use Default") { remoteEditorPath = "" }
+                        }
+                    }
+                }
+            } footer: {
+                Text("A double-click in the file browser copies the file to this "
+                    + "Mac, opens it here, and copies each save back.")
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private var editorName: String {
+        guard let url = AppSettings.remoteEditorURL else {
+            return "The default application"
+        }
+        return FileManager.default.displayName(atPath: url.path)
+    }
+
+    private func chooseEditor() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.message = "Choose the application that opens remote files."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        remoteEditorPath = url.path
     }
 }
 

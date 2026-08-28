@@ -19,6 +19,9 @@ enum AppSettings {
     static let defaultHostKeyPolicyKey = "TermoraDefaultHostKeyPolicy"
     static let defaultKeepAliveKey = "TermoraDefaultKeepAliveSeconds"
     static let connectTimeoutKey = "TermoraConnectTimeoutSeconds"
+    /// The application that opens a remote file for editing. Empty means the
+    /// default application for the file's type.
+    static let remoteEditorPathKey = "TermoraRemoteEditorPath"
 
     /// The value each setting has until a person changes it. Registering
     /// keeps `@AppStorage` in the Settings window and the readers below on
@@ -57,6 +60,13 @@ enum AppSettings {
     /// a stray value from cutting a connection off before a person can type.
     static var connectTimeoutSeconds: Int {
         max(10, UserDefaults.standard.integer(forKey: connectTimeoutKey))
+    }
+
+    /// The chosen editor application, when one is set and still installed.
+    static var remoteEditorURL: URL? {
+        let path = UserDefaults.standard.string(forKey: remoteEditorPathKey) ?? ""
+        guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else { return nil }
+        return URL(fileURLWithPath: path)
     }
 
     /// The values a connection uses when no folder or bookmark sets one.

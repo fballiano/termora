@@ -48,12 +48,19 @@ final class FileBrowserModel: ObservableObject {
     @Published var renameRequest: SFTPEntry?
     @Published var deleteRequest: [SFTPEntry] = []
 
+    /// Set by the owner. Opens one remote file in an editor on this Mac; the
+    /// second value is the application to use, or `nil` for the chosen one.
+    var onEdit: ((SFTPEntry, URL?) -> Void)?
+
     private var client: SFTPClient?
+    private var transport: SFTPProcessTransport?
     private let sshConnection: SSHConnection
 
     init(sshConnection: SSHConnection) {
         self.sshConnection = sshConnection
     }
+
+    var connectionID: UUID { sshConnection.id }
 
     var canGoUp: Bool {
         currentPath != "/" && !currentPath.isEmpty
@@ -71,6 +78,7 @@ final class FileBrowserModel: ObservableObject {
             executable: SSHCommand.executable,
             arguments: sshConnection.sftpArguments()
         )
+        self.transport = transport
         let client = SFTPClient(transport: transport)
         self.client = client
 
@@ -80,7 +88,17 @@ final class FileBrowserModel: ObservableObject {
             state = .ready
             await go(to: home)
         } catch {
-            state = .failed(error.localizedDescription)
+            // ssh says on standard error why the channel did not open, and
+            // the last line is the one that names the problem.
+            var reason = error.localizedDescription
+            let said = transport.errorOutput
+                .split(whereSeparator: \.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .last { !$0.isEmpty }
+            if let said, !reason.contains(said) {
+                reason += "\n" + said
+            }
+            state = .failed(reason)
         }
     }
 
@@ -119,6 +137,10 @@ final class FileBrowserModel: ObservableObject {
     func open(_ entry: SFTPEntry) async {
         if entry.isDirectory {
             await go(to: entry.path)
+        } else if let onEdit {
+            // A double-click opens the file the way Finder would: a copy
+            // comes to this Mac, opens in an editor, and each save goes back.
+            onEdit(entry, nil)
         } else {
             await download([entry])
         }

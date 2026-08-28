@@ -9,6 +9,7 @@ import TermoraSFTP
 /// The file browser of one connection.
 struct FileBrowserView: View {
     @ObservedObject var model: FileBrowserModel
+    @EnvironmentObject private var remoteEdits: RemoteEditController
     @StateObject private var local = LocalFileModel()
     @State private var isAskingNewFolder = false
     @State private var newFolderName = ""
@@ -54,6 +55,10 @@ struct FileBrowserView: View {
                 if let transfer = model.transfer {
                     Divider()
                     progressBar(transfer)
+                }
+                if !editsHere.isEmpty {
+                    Divider()
+                    editsBar
                 }
             }
         }
@@ -195,6 +200,23 @@ struct FileBrowserView: View {
         RemoteFileTable(model: model)
     }
 
+    /// The remote files of this connection that are open in an editor.
+    private var editsHere: [RemoteEdit] {
+        remoteEdits.edits.filter { $0.connection.id == model.connectionID }
+    }
+
+    /// One row per open edit: the name, what it is doing, and a way to end it.
+    private var editsBar: some View {
+        VStack(spacing: 4) {
+            ForEach(editsHere) { edit in
+                EditRow(edit: edit) { remoteEdits.end(edit) }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.bar)
+    }
+
     private func progressBar(_ transfer: FileBrowserModel.Transfer) -> some View {
         HStack(spacing: 10) {
             Image(systemName: transfer.isUpload ? "arrow.up.circle" : "arrow.down.circle")
@@ -237,6 +259,49 @@ struct FileBrowserView: View {
         formatter.dateStyle = .short
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+}
+
+/// One remote file open in an editor, shown at the foot of the browser.
+private struct EditRow: View {
+    @ObservedObject var edit: RemoteEdit
+    let onEnd: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "pencil.circle")
+                .foregroundStyle(.tint)
+            Text(edit.name).lineLimit(1)
+            Text(edit.remotePath)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.head)
+            Spacer()
+            switch edit.activity {
+            case .downloading, .uploading:
+                ProgressView().controlSize(.small)
+                Text(edit.activity == .uploading ? "Copying back…" : "Copying here…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            case let .failed(reason):
+                Label(reason, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+            case .idle:
+                Text("Saves are copied back")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                onEnd()
+            } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Stop editing. The copy on this Mac is removed.")
+        }
     }
 }
 

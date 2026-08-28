@@ -324,6 +324,13 @@ extension RemoteFileTable.Coordinator: NSMenuDelegate {
         if chosen.count == 1 {
             menu.addItem(withTitle: "Open", action: #selector(openChosenRow(_:)), keyEquivalent: "")
                 .target = self
+            if !clicked.isDirectory, !clicked.isSymbolicLink {
+                menu.addItem(withTitle: "Edit", action: #selector(editChosen), keyEquivalent: "")
+                    .target = self
+                let openWith = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+                openWith.submenu = openWithMenu(for: clicked)
+                menu.addItem(openWith)
+            }
             menu.addItem(withTitle: "Rename…", action: #selector(renameChosen), keyEquivalent: "")
                 .target = self
         }
@@ -333,6 +340,58 @@ extension RemoteFileTable.Coordinator: NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(withTitle: "Delete", action: #selector(deleteChosen), keyEquivalent: "")
             .target = self
+    }
+
+    /// The applications on this Mac that open files of the clicked kind.
+    ///
+    /// The kind comes from the name's extension: the file itself is on the
+    /// far host, so there is nothing local to ask about.
+    private func openWithMenu(for entry: SFTPEntry) -> NSMenu {
+        let submenu = NSMenu()
+        let kind = UTType(filenameExtension: (entry.name as NSString).pathExtension)
+            ?? .plainText
+        let applications = NSWorkspace.shared.urlsForApplications(toOpen: kind)
+            .sorted { $0.lastPathComponent
+                .localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+
+        for application in applications.prefix(20) {
+            let item = NSMenuItem(
+                title: FileManager.default.displayName(atPath: application.path),
+                action: #selector(editChosenWith(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = application
+            item.image = NSWorkspace.shared.icon(forFile: application.path)
+            item.image?.size = NSSize(width: 16, height: 16)
+            submenu.addItem(item)
+        }
+        if submenu.items.isEmpty {
+            let none = NSMenuItem(title: "No application opens this kind",
+                                  action: nil, keyEquivalent: "")
+            none.isEnabled = false
+            submenu.addItem(none)
+        }
+        return submenu
+    }
+
+    /// The single chosen file, when there is exactly one and it is editable.
+    private var editableChosenEntry: SFTPEntry? {
+        let chosen = model.selectedEntries
+        guard chosen.count == 1, let entry = chosen.first,
+              !entry.isDirectory, !entry.isSymbolicLink else { return nil }
+        return entry
+    }
+
+    @objc private func editChosen() {
+        guard let entry = editableChosenEntry else { return }
+        model.onEdit?(entry, nil)
+    }
+
+    @objc private func editChosenWith(_ sender: NSMenuItem) {
+        guard let entry = editableChosenEntry,
+              let application = sender.representedObject as? URL else { return }
+        model.onEdit?(entry, application)
     }
 
     @objc private func renameChosen() {

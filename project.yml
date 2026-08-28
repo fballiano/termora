@@ -9,7 +9,8 @@ options:
 
 packages:
   GhosttyKit:
-    path: Packages/GhosttyKit
+    url: https://github.com/Lakr233/libghostty-spm
+    exactVersion: 1.4.5
   TermoraModel:
     path: Packages/TermoraModel
   TermoraVault:

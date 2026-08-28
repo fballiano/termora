@@ -52,8 +52,8 @@ final class TabSwitchDuringConnectTests: XCTestCase {
             withIntermediateDirectories: true
         )
 
-        // `seq` fills the whole pane with text, so a screenshot of any part
-        // of a drawn terminal is far from uniform.
+        // The wrapped numbers fill the pane's whole width with text, so the
+        // sampled patch holds dark pixels in a light theme and a dark one.
         func settings(delaySeconds: Int) -> NodeSettings {
             NodeSettings(
                 username: .value(NSUserName()),
@@ -61,7 +61,7 @@ final class TabSwitchDuringConnectTests: XCTestCase {
                     path: keyPath, passphrase: Secret("")
                 )),
                 hostKeyPolicy: .value(.acceptNew),
-                afterConnectText: .value("seq 1 200{ENTER}"),
+                afterConnectText: .value("seq 1 2000 | tr '\\n' ' '{ENTER}"),
                 beforeConnect: delaySeconds > 0
                     ? .value(LocalCommand(
                         name: "Wait", launchPath: "/bin/sleep",

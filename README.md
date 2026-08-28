@@ -520,18 +520,11 @@ once, with a fixed command that carries no value from any document.
 way a shell does. Royal's own `Ping` task names `ping`, which lives in `/sbin`
 on a Mac, so without the search it would fail too.
 
-### Termora carries its own copy of libghostty-spm
+### Termora uses the upstream libghostty-spm
 
-`Packages/GhosttyKit` is a copy of `Lakr233/libghostty-spm` at Ghostty 1.3.1.
-The binary framework still comes from the upstream release by URL and checksum,
-so only the Swift wrapper is ours. `Packages/GhosttyKit/FORK.md` says exactly
-what was changed and why. **Read it before taking a newer upstream version.**
-
-The wrapper kept **one** wakeup handler on the controller that every surface
-shares. A new surface wrote over it, and closing any surface cleared it, so no
-surface was told to draw. With one terminal open nothing looks wrong. With
-tabs, a tab stays open, stays connected, and draws nothing, while the tab bar
-still reports it ready.
-
-The controller now keeps a set of observers: it ticks while **any** surface
-wants it, and then tells **every** surface.
+Termora depends on `Lakr233/libghostty-spm`, pinned to an exact version in
+`project.yml`. It once carried a vendored copy with three fixes; all three
+are upstream since 1.4.5 — the wakeup observers, `isSurfaceVisible` as a
+representable input, and programmatic key presses through
+`ghostty_surface_key`. Before pinning a newer version, check that the three
+are still there: each guards against a bug Termora hit in real use.

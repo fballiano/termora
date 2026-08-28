@@ -74,10 +74,12 @@ packages in `Packages/`:
   forever rather than failing.
 - **TermoraSFTP** — an SFTP v3 client that runs over the control master's
   `-s sftp` channel. No cryptography of its own.
-- **GhosttyKit** — a **vendored fork** of `Lakr233/libghostty-spm` (Ghostty
-  1.3.1). Read `Packages/GhosttyKit/FORK.md` before updating it: the fork
-  replaces the single wakeup handler with a set of observers, and the bug
-  returns if an upstream update overwrites that.
+- **GhosttyKit** — the upstream `Lakr233/libghostty-spm` package (Ghostty
+  1.3.1), pinned to an exact version in `project.yml`. Termora once carried
+  a vendored fork with three fixes; all three are upstream since 1.4.5, so
+  the copy is gone. Before pinning a newer version, check that the wakeup
+  observers, `isSurfaceVisible` as a representable input, and
+  `sendKey(_:)` are still there — each guards against a bug Termora hit.
 
 In the app target, `Termora/Terminal/` is the only code that calls
 libghostty. `Termora/Sessions/SessionsController.swift` owns tabs/splits;

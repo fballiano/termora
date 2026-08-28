@@ -458,7 +458,7 @@ final class SessionsController: ObservableObject {
         }
     }
 
-    private static func terminalKey(for key: KeySequence.Key) -> TerminalKeyPress {
+    private static func terminalKey(for key: KeySequence.Key) -> TerminalKey {
         switch key {
         case .enter: .enter
         case .tab: .tab

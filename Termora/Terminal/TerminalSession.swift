@@ -101,7 +101,7 @@ final class TerminalSession: Identifiable, ObservableObject {
     /// inserts a pasted `\r` instead of running the line. A key press is
     /// never framed as a paste.
     @discardableResult
-    func press(_ key: TerminalKeyPress) -> Bool {
+    func press(_ key: TerminalKey) -> Bool {
         state.sendKey(key)
     }
 

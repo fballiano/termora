@@ -115,6 +115,13 @@ public final class Vault {
         kdf = newKDF
         key = newKey
         try save()
+        // The save above copied the previous file to `.bak`, and that file
+        // still opens with the old password. Replace it with a copy sealed
+        // by the new key, so the old password truly stops working.
+        let fileManager = FileManager.default
+        let backup = url.appendingPathExtension("bak")
+        try? fileManager.removeItem(at: backup)
+        try? fileManager.copyItem(at: url, to: backup)
     }
 
     /// The key and the salt, for the Keychain cache.

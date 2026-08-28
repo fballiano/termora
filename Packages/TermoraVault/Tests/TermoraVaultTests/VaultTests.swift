@@ -175,3 +175,28 @@ func changingThePassword() async throws {
     let reopened = try await Vault.open(at: url, password: "new pass")
     #expect(reopened.document.connections.map(\.name) == ["web-01"])
 }
+
+@MainActor
+@Test("After a password change, the backup no longer opens with the old password")
+func passwordChangeSealsTheBackupToo() async throws {
+    let directory = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("termora-test-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("Connections.termora")
+
+    let vault = try await Vault.create(at: url, password: "old pass", document: sampleDocument())
+    // A save first, so a backup written with the old key exists.
+    vault.update { $0.add(Folder(name: "Staging")) }
+    try vault.save()
+
+    try await vault.changePassword(to: "new pass")
+
+    let backup = url.appendingPathExtension("bak")
+    #expect(FileManager.default.fileExists(atPath: backup.path),
+            "The backup stays: it is resealed, not thrown away.")
+    await #expect(throws: VaultError.cannotDecrypt) {
+        _ = try await Vault.open(at: backup, password: "old pass")
+    }
+    let reopened = try await Vault.open(at: backup, password: "new pass")
+    #expect(reopened.document.connections.map(\.name) == ["web-01"])
+}

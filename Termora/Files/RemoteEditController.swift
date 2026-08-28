@@ -4,6 +4,7 @@
 //
 
 import AppKit
+import Combine
 import Foundation
 import TermoraSFTP
 import TermoraSSH
@@ -69,6 +70,8 @@ final class RemoteEditController: ObservableObject {
     /// that saves in several steps is read once, at the end.
     private static let settleAfterSave = Duration.milliseconds(400)
 
+    private var subscriptions: [UUID: AnyCancellable] = [:]
+
     private static var editsRoot: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Termora/Edits", isDirectory: true)
@@ -99,6 +102,9 @@ final class RemoteEditController: ObservableObject {
         let folder = Self.editsRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let edit = RemoteEdit(entry: entry, connection: connection, folderURL: folder)
         edits.append(edit)
+        // Observers of the controller see each edit's activity change too.
+        subscriptions[edit.id] = edit.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
         Task { await start(edit, with: application) }
     }
 
@@ -266,6 +272,7 @@ final class RemoteEditController: ObservableObject {
 
     /// Stops the watch and removes the local copy.
     func end(_ edit: RemoteEdit) {
+        subscriptions[edit.id] = nil
         edit.pendingCheck?.cancel()
         edit.pendingCheck = nil
         edit.watcher?.cancel()

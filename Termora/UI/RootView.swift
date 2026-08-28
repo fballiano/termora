@@ -182,6 +182,9 @@ struct MainWindowView: View {
         .background(
             TitlebarTabs(sessions: sessions, store: store).frame(width: 0, height: 0)
         )
+        // A save must be seen without a sheet: the sign floats in the corner
+        // while an edited file travels, whatever tab is in front.
+        .overlay(alignment: .bottomTrailing) { RemoteEditIndicator() }
         // The editor is a sheet, so the terminal keeps the whole window.
         .sheet(item: Binding(
             get: { store.editingID.map(EditTarget.init) },
@@ -198,6 +201,81 @@ struct MainWindowView: View {
 /// Wraps the identifier being edited, so a sheet can be driven by it.
 struct EditTarget: Identifiable {
     let id: UUID
+}
+
+/// The floating sign for remote edits: a spinner while a file travels,
+/// a short confirmation once it has arrived.
+private struct RemoteEditIndicator: View {
+    @EnvironmentObject private var remoteEdits: RemoteEditController
+    @State private var doneText: String?
+    @State private var doneTask: Task<Void, Never>?
+
+    /// What is on the move, reduced to the words the sign shows.
+    private struct Travel: Equatable {
+        let text: String
+        let doneText: String
+    }
+
+    private var travel: Travel? {
+        let moving = remoteEdits.edits.filter {
+            $0.activity == .uploading || $0.activity == .downloading
+        }
+        guard let first = moving.first else { return nil }
+        if moving.count > 1 {
+            return Travel(text: "Copying \(moving.count) files…",
+                          doneText: "Files copied")
+        }
+        let isUpload = first.activity == .uploading
+        return Travel(
+            text: isUpload ? "Copying \(first.name) back…" : "Copying \(first.name) here…",
+            doneText: isUpload ? "\(first.name) copied back" : "\(first.name) copied here"
+        )
+    }
+
+    var body: some View {
+        let travel = travel
+        ZStack {
+            if let travel {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(travel.text)
+                }
+                .modifier(Sign())
+            } else if let doneText {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text(doneText)
+                }
+                .modifier(Sign())
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: travel == nil)
+        .animation(.easeInOut(duration: 0.2), value: doneText == nil)
+        .onChange(of: travel) { previous, current in
+            guard current == nil, let previous else { return }
+            doneTask?.cancel()
+            doneText = previous.doneText
+            doneTask = Task {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                doneText = nil
+            }
+        }
+    }
+
+    private struct Sign: ViewModifier {
+        func body(content: Content) -> some View {
+            content
+                .font(.callout)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(.separator))
+                .padding(16)
+                .transition(.opacity)
+        }
+    }
 }
 
 /// The editor, shown over the window rather than beside it.

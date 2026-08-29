@@ -30,6 +30,9 @@ public actor SFTPClient {
     /// the request when no reply comes.
     private var watchdogs: [UInt32: Task<Void, Never>] = [:]
     private var versionWatchdog: Task<Void, Never>?
+    /// Takes the incoming chunks one at a time, in the order they arrive.
+    private var receiveLoop: Task<Void, Never>?
+    private var incomingChunks: AsyncStream<Data>.Continuation?
     private var incoming = Data()
     private var isClosed = false
     private var versionWaiter: CheckedContinuation<UInt32, any Error>?
@@ -52,14 +55,27 @@ public actor SFTPClient {
 
     /// Starts the channel and agrees the version.
     public func start() async throws {
-        try transport.start(
-            onData: { [weak self] data in
-                Task { await self?.receive(data) }
-            },
-            onClose: { [weak self] in
-                Task { await self?.channelClosed() }
-            }
+        // The pipe hands over the bytes in order, and they must reach the
+        // buffer in that same order. A separate Task for each chunk does not
+        // keep the order: the actor takes them as it likes, the length in
+        // front of a packet then falls on the wrong bytes, and the copy is
+        // silently wrong. One stream and one reader keep the order.
+        let (chunks, continuation) = AsyncStream<Data>.makeStream(
+            of: Data.self, bufferingPolicy: .unbounded
         )
+        incomingChunks = continuation
+
+        try transport.start(
+            onData: { continuation.yield($0) },
+            onClose: { continuation.finish() }
+        )
+
+        receiveLoop = Task { [weak self] in
+            for await data in chunks {
+                await self?.receive(data)
+            }
+            await self?.channelClosed()
+        }
 
         try transport.send(SFTPWriter.packet(.initialise) { $0.write(Self.version) })
 
@@ -73,6 +89,10 @@ public actor SFTPClient {
     public func stop() {
         isClosed = true
         transport.stop()
+        incomingChunks?.finish()
+        incomingChunks = nil
+        receiveLoop?.cancel()
+        receiveLoop = nil
         failEveryWaiter(with: SFTPError.channelClosed)
     }
 

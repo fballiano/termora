@@ -185,11 +185,15 @@ struct LocalFileTable: NSViewRepresentable {
                         atDestination: destination,
                         options: [:],
                         operationQueue: receiveQueue
-                    ) { _, error in
-                        Task { @MainActor [weak self] in
-                            if let error {
+                    ) { @Sendable [weak self] _, error in
+                        // AppKit calls this on `receiveQueue`, never on the main
+                        // thread. The closure must stay nonisolated, or the
+                        // isolation check traps and the app stops.
+                        let reason = error?.localizedDescription
+                        Task { @MainActor in
+                            if let reason {
                                 self?.model.errorMessage =
-                                    "Termora could not copy that file. \(error.localizedDescription)"
+                                    "Termora could not copy that file. \(reason)"
                             }
                             self?.model.reload()
                         }

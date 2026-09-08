@@ -56,13 +56,18 @@ struct RootView: View {
             ),
             titleVisibility: .visible
         ) {
+            // The two shortcuts are named. A dialog whose buttons carry only
+            // a role has no default button: ⏎ and the space bar then do
+            // nothing at all, and the only way to answer is the mouse.
             Button("Close", role: .destructive) {
                 if let request = sessions.paneCloseRequest {
                     sessions.close(paneID: request.paneID)
                 }
                 sessions.paneCloseRequest = nil
             }
+            .keyboardShortcut(.defaultAction)
             Button("Cancel", role: .cancel) { sessions.paneCloseRequest = nil }
+                .keyboardShortcut(.cancelAction)
         } message: {
             Text("A program still runs in it.")
         }

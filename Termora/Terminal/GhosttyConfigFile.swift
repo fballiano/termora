@@ -55,6 +55,30 @@ enum GhosttyConfigFile {
         return false
     }
 
+    /// The key presses that `keybind` lines in the file bind.
+    ///
+    /// A `keybind` line reads `keybind = <trigger>=<action>`. The trigger is
+    /// everything up to the first `=` of the value. Termora leaves a trigger
+    /// of yours alone; see `GhosttyEnvironment.menuKeyTriggers`.
+    static func boundTriggers(in text: String) -> Set<String> {
+        var triggers: Set<String> = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("#"), let separator = trimmed.firstIndex(of: "=") else {
+                continue
+            }
+            guard trimmed[..<separator].trimmingCharacters(in: .whitespaces) == "keybind" else {
+                continue
+            }
+            let value = trimmed[trimmed.index(after: separator)...]
+                .trimmingCharacters(in: .whitespaces)
+            guard let end = value.firstIndex(of: "=") else { continue }
+            let trigger = value[..<end].trimmingCharacters(in: .whitespaces)
+            if !trigger.isEmpty { triggers.insert(trigger.lowercased()) }
+        }
+        return triggers
+    }
+
     /// Splits `light:One,dark:Two` into its two names.
     private static func split(_ value: String) -> ThemeChoice? {
         let parts = value.split(separator: ",").map {

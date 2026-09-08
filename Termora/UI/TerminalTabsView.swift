@@ -72,8 +72,12 @@ struct TabBar: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 4) {
-                ForEach(sessions.tabs) { tab in
-                    TabButton(tab: tab, isSelected: tab.id == sessions.selectedTabID)
+                ForEach(Array(sessions.tabs.enumerated()), id: \.element.id) { at, tab in
+                    TabButton(
+                        tab: tab,
+                        position: at,
+                        isSelected: tab.id == sessions.selectedTabID
+                    )
                 }
             }
             .padding(.horizontal, 4)
@@ -85,6 +89,8 @@ struct TabBar: View {
 
 private struct TabButton: View {
     @ObservedObject var tab: TerminalTab
+    /// Where the tab sits in the row, counted from zero.
+    let position: Int
     let isSelected: Bool
     @EnvironmentObject private var sessions: SessionsController
     @State private var isHovering = false
@@ -105,28 +111,27 @@ private struct TabButton: View {
                 .font(.system(size: 12))
                 .lineLimit(1)
                 .truncationMode(.tail)
-            Button {
-                sessions.closeTab(tab.id)
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8, weight: .bold))
-                    .frame(width: 13, height: 13)
-                    .background(
-                        Circle().fill(isHoveringClose
-                                      ? AnyShapeStyle(.tertiary)
-                                      : AnyShapeStyle(.clear))
-                    )
-                    .contentShape(Circle())
+            // The name takes the room that is left, so the slot after it sits
+            // in the corner of the tab and not beside the name.
+            Spacer(minLength: 2)
+            // One slot at the end of the tab, of one size. It holds the key
+            // that chooses the tab, and the close mark while the pointer is
+            // over the tab. The name never moves as the two change over.
+            ZStack {
+                if isHovering {
+                    closeMark
+                } else if let shortcut = shortcutName {
+                    Text(shortcut)
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
             }
-            .buttonStyle(.plain)
-            .onHover { isHoveringClose = $0 }
-            // The close mark keeps its room even when it is not drawn, so a
-            // name does not jump sideways as the pointer passes over it.
-            .opacity(isHovering || isSelected ? 1 : 0)
-            .help("Close this tab")
+            .frame(width: 20, height: 13)
         }
         .padding(.leading, 8)
-        .padding(.trailing, 6)
+        .padding(.trailing, 4)
         // Every tab is the same size, so the gaps between them are even and
         // a long name cannot push its neighbours about.
         .frame(width: 150, height: TabBar.height - 6)
@@ -145,6 +150,36 @@ private struct TabButton: View {
         // finds the sidebar row of the same name and passes while the tab bar
         // draws nothing at all.
         .accessibilityIdentifier("tab-\(tab.connectionName)")
+        // The chosen tab says so, for VoiceOver and for the tests.
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    private var closeMark: some View {
+        Button {
+            sessions.closeTab(tab.id)
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .frame(width: 13, height: 13)
+                .background(
+                    Circle().fill(isHoveringClose
+                                  ? AnyShapeStyle(.tertiary)
+                                  : AnyShapeStyle(.clear))
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHoveringClose = $0 }
+        .help("Close this tab")
+    }
+
+    /// The key that chooses this tab, or nothing after the ninth tab.
+    ///
+    /// The menu binds ⌘1…⌘9 to the first nine tabs. See the Session menu in
+    /// `TermoraApp`.
+    private var shortcutName: String? {
+        guard position < 9 else { return nil }
+        return "⌘\(position + 1)"
     }
 
     /// A tab you point at is marked, so it is clear what a click will hit.

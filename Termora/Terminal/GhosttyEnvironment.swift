@@ -36,6 +36,7 @@ enum GhosttyEnvironment {
     /// - `font-size`: Ghostty uses 13.
     /// - `font-thicken`: Ghostty leaves this off. Thickening makes every
     ///   stroke heavier, which is plain on a light theme.
+    /// - `keybind`: see `menuKeyTriggers`.
     static func userConfiguration() -> TerminalConfiguration {
         GhosttyFonts.register()
 
@@ -55,8 +56,56 @@ enum GhosttyEnvironment {
         if !GhosttyConfigFile.setsAKey("font-thicken", in: text) {
             configuration = configuration.fontThicken(false)
         }
+
+        let yours = GhosttyConfigFile.boundTriggers(in: text)
+        for trigger in menuKeyTriggers where !yours.contains(trigger) {
+            configuration = configuration.custom("keybind", "\(trigger)=unbind")
+        }
         return configuration
     }
+
+    /// The key presses that belong to Termora's menus, not to a pane.
+    ///
+    /// A pane answers a key before the menu bar sees it: AppKit offers a key
+    /// equivalent to the views of the key window first, and the Ghostty view
+    /// takes every key that Ghostty binds. Ghostty binds ⌘1…⌘9 to `goto_tab`,
+    /// ⌘⇧[ and ⌘⇧] to its own tabs, ⌘D to a split, and more. Termora has no
+    /// tabs or splits inside a pane, so it drops those actions: the key press
+    /// was eaten, the menu never ran, and nothing happened at all.
+    ///
+    /// Each trigger below is unbound in the pane, so the menu item answers it.
+    /// A trigger your own configuration file binds is left alone, the way
+    /// every other key in this file is.
+    ///
+    /// ⌘W is not in the list on purpose. Ghostty must keep it: closing a pane
+    /// with a program still in it asks you first, and only Ghostty knows that
+    /// the program is there.
+    ///
+    /// Ghostty binds a digit twice, as the character and as the key in that
+    /// position, so that a keyboard with digits on shifted keys still works.
+    /// Both forms are unbound.
+    static let menuKeyTriggers: [String] = {
+        let digitKeyNames = [
+            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+        ]
+        var triggers: [String] = []
+        for (index, name) in digitKeyNames.enumerated() {
+            triggers.append("super+\(index + 1)")
+            triggers.append("super+physical:\(name)")
+        }
+        triggers += [
+            "super+shift+[",  // Session, Previous Tab
+            "super+shift+]",  // Session, Next Tab
+            "super+d",        // Session, Split Right
+            "super+shift+d",  // Session, Split Down
+            "super+enter",    // Session, Connect
+            "super+shift+f",  // Session, Browse Files
+            "super+n",        // File, New Connection
+            "super+shift+w",  // File, Close Window
+            "super+,",        // Termora, Settings…
+        ]
+        return triggers
+    }()
 
     /// The font size Ghostty uses when a configuration file names none.
     static let ghosttyFontSize: Float = 13

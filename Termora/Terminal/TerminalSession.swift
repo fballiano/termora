@@ -89,10 +89,14 @@ final class TerminalSession: Identifiable, ObservableObject {
         state.requestFocus()
     }
 
-    /// Type text into the pane, as if you had typed it.
+    /// Put text into the pane, as a paste.
+    ///
+    /// A program with bracketed paste on receives it as a paste, so a `\r`
+    /// in the text lands in the edit line instead of running the line. Send
+    /// the Enter key with `press(_:)` to run it.
     @discardableResult
     func send(_ text: String) -> Bool {
-        state.send(text)
+        state.paste(text: text)
     }
 
     /// Press one named key in the pane.

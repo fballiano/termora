@@ -52,11 +52,15 @@ public enum ProcessRunner {
     /// - Parameter limit: stop the command after this many seconds. A command
     ///   that waits for an answer has no place to ask for one, so without a
     ///   limit it would wait for ever. `nil` means wait as long as it takes.
+    /// - Parameter input: text for the standard input of the command. It is
+    ///   written in one piece, so keep it well below the 64 KB a pipe holds.
+    ///   A larger text would fill the pipe, and both sides would then wait.
     public static func run(
         _ executable: String,
         _ arguments: [String],
         environment: [String: String]? = nil,
         limit: TimeInterval? = nil,
+        input: String? = nil,
         onOutput: (@Sendable (String) -> Void)? = nil
     ) async -> CommandResult {
         await withCheckedContinuation { continuation in
@@ -70,6 +74,8 @@ public enum ProcessRunner {
                 let errorPipe = Pipe()
                 process.standardOutput = outPipe
                 process.standardError = errorPipe
+                let inputPipe = input.map { _ in Pipe() }
+                if let inputPipe { process.standardInput = inputPipe }
 
                 do {
                     try process.run()
@@ -91,6 +97,14 @@ public enum ProcessRunner {
                     timer = source
                 }
                 defer { timer?.cancel() }
+
+                // Feed the command, then close the pipe. A command that reads
+                // to the end of its input never stops while the pipe is open.
+                if let inputPipe, let input {
+                    let handle = inputPipe.fileHandleForWriting
+                    try? handle.write(contentsOf: Data(input.utf8))
+                    try? handle.close()
+                }
 
                 // Read both pipes at the same time. Reading one to its end
                 // first would stop the child as soon as the other pipe fills,

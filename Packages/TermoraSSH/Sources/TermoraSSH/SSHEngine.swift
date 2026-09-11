@@ -32,11 +32,19 @@ public final class SSHEngine: ObservableObject {
     /// to the next connection, not to one already opening.
     public var connectTimeout: Duration = .seconds(180)
 
+    /// The terminal that the panes of this application draw with.
+    ///
+    /// Leave it `nil` when there is no terminal, for example in a test. Every
+    /// connection then announces the name that all servers understand.
+    public var localTerminal: LocalTerminal?
+
     private let service: AskpassService
     private let helperPath: String
     private let controlDirectory: URL
     /// Maps an askpass token back to the connection that owns it.
     private var tokens: [String: UUID] = [:]
+    /// The servers that already hold the description of the local terminal.
+    private let terminfoCache = TerminfoCache()
 
     /// - Parameter helperPath: the full path of `termora-askpass` inside the
     ///   application bundle.
@@ -84,7 +92,53 @@ public final class SSHEngine: ObservableObject {
         tokens[token] = id
         connections[id] = connection
         await connection.connect()
+        if connection.isConnected { await prepareTerminal(on: connection) }
         return connection
+    }
+
+    // MARK: - The terminal of the far end
+
+    /// Decides what a pane on this connection announces as `TERM`.
+    ///
+    /// OpenSSH copies `TERM` into the request for the far terminal. Termora
+    /// draws with Ghostty, and almost no server holds the description of
+    /// `xterm-ghostty`, so `htop` and `vim` stop with "Error opening
+    /// terminal". Termora therefore puts the description on the server first,
+    /// over the control master that is already open. Nobody is asked for a
+    /// password again, and the work happens once per server.
+    ///
+    /// A server that cannot take the description hears `xterm-256color`,
+    /// which every server understands.
+    private func prepareTerminal(on connection: SSHConnection) async {
+        guard let localTerminal else { return }
+        let installed = await installTerminfo(localTerminal, on: connection)
+        connection.setTerminalType(installed ? localTerminal.name : RemoteTerminfo.compatibleName)
+    }
+
+    /// Returns true when the far end now understands the local terminal.
+    private func installTerminfo(
+        _ terminal: LocalTerminal, on connection: SSHConnection
+    ) async -> Bool {
+        guard let source = await RemoteTerminfo.source(of: terminal) else { return false }
+
+        let key = "\(connection.target.destination):\(connection.target.port)"
+        let fingerprint = RemoteTerminfo.fingerprint(of: source)
+        if terminfoCache.holds(fingerprint, for: key) { return true }
+
+        let result = await connection.run(
+            RemoteTerminfo.installWords(for: terminal.name),
+            limit: RemoteTerminfo.limit,
+            input: source
+        )
+        // A server without `tic`, or a read-only home directory, fails here.
+        // That is not an error to report: the connection simply uses the name
+        // that every server understands.
+        guard result.succeeded else {
+            terminfoCache.forget(key)
+            return false
+        }
+        terminfoCache.record(fingerprint, for: key)
+        return true
     }
 
     public func disconnect(id: UUID) async {

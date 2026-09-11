@@ -31,6 +31,11 @@ public final class SSHConnection: ObservableObject, Identifiable {
 
     @Published public private(set) var state: State = .idle
     @Published public private(set) var activeForwards: Set<UUID> = []
+    /// The value of `TERM` that a pane on this connection must announce.
+    ///
+    /// The engine sets it once the connection is up. Until then it holds the
+    /// name that every server understands.
+    @Published public private(set) var terminalType: String = RemoteTerminfo.compatibleName
     /// Everything the master wrote to standard error, for the details sheet.
     @Published public private(set) var log: String = ""
 
@@ -162,14 +167,38 @@ public final class SSHConnection: ObservableObject, Identifiable {
     /// The command line for a terminal pane. It attaches to the master, so it
     /// opens with no second authentication.
     public func terminalCommandLine() -> String {
+        // `env` sets TERM for the `ssh` process, and OpenSSH copies TERM into
+        // the request for the far terminal. Setting it here, and not in the
+        // environment of the pane, keeps the value under Termora's control:
+        // the terminal engine gives the pane a TERM of its own.
         POSIXQuote.line(
-            [SSHCommand.executable] + SSHCommand.session(target: target, controlPath: controlPath)
+            ["/usr/bin/env", "TERM=\(terminalType)", SSHCommand.executable]
+                + SSHCommand.session(target: target, controlPath: controlPath)
         )
     }
 
     /// The arguments for an SFTP channel on this same connection.
     public func sftpArguments() -> [String] {
         SSHCommand.sftpSubsystem(target: target, controlPath: controlPath)
+    }
+
+    /// Runs one command on this connection and waits for it to end.
+    ///
+    /// The command gets no terminal, so use it for work, not for a shell.
+    @discardableResult
+    public func run(
+        _ words: [String], limit: TimeInterval? = nil, input: String? = nil
+    ) async -> CommandResult {
+        await ProcessRunner.run(
+            SSHCommand.executable,
+            Array(commandArguments(words).dropFirst()),
+            environment: environment, limit: limit, input: input
+        )
+    }
+
+    /// The engine sets this once it knows what the far end understands.
+    func setTerminalType(_ name: String) {
+        terminalType = name
     }
 
     /// The argv that runs one command on this connection and then returns.

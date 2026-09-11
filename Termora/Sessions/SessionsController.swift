@@ -158,6 +158,7 @@ final class SessionsController: ObservableObject {
         do {
             let engine = try SSHEngine(helperPath: Self.helperPath())
             engine.delegate = self
+            engine.localTerminal = GhosttyEnvironment.localTerminal
             engineStorage = engine
             return engine
         } catch {

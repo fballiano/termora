@@ -6,6 +6,7 @@
 import Foundation
 import GhosttyTerminal
 import GhosttyTheme
+import TermoraSSH
 
 /// The single Ghostty runtime for the whole application.
 ///
@@ -22,6 +23,24 @@ enum GhosttyEnvironment {
         theme: userTheme(),
         terminalConfiguration: userConfiguration()
     )
+
+    /// The name every pane announces as `TERM`.
+    ///
+    /// libghostty exports this name to the program it runs. Termora never
+    /// changes it for a local pane: a pane on this Mac reads the description
+    /// from the application bundle and works.
+    static let terminalName = "xterm-ghostty"
+
+    /// The terminal of a pane, and where its description lives.
+    ///
+    /// The description ships inside Termora, so a Mac without the Ghostty
+    /// application can still send it to a server.
+    static var localTerminal: LocalTerminal {
+        LocalTerminal(
+            name: terminalName,
+            databasePath: GhosttyRuntimeResources.terminfoDirectoryURL?.path
+        )
+    }
 
     /// The settings Termora adds on top of your own configuration file.
     ///

@@ -30,6 +30,7 @@ engine through libghostty, and it drives the OpenSSH of macOS, so your
 <tr><td><b>A bookmark tree</b></td><td>Folders pass credentials and settings down. A connection overrides only what it sets.</td></tr>
 <tr><td><b>Your terminal</b></td><td>The Ghostty engine reads your own Ghostty configuration, so a pane looks like your terminal.</td></tr>
 <tr><td><b>One connection</b></td><td>One control master carries every pane, every tunnel and the file browser. Nothing authenticates twice.</td></tr>
+<tr><td><b>htop just works</b></td><td>Termora teaches each server what <code>xterm-ghostty</code> is, once, over the connection it already has. A server that refuses hears <code>xterm-256color</code>.</td></tr>
 <tr><td><b>Tabs and splits</b></td><td>Tabs live in the title bar. ⌘D splits right, ⇧⌘D splits down, ⌘1…⌘9 switch, ⌥⌘← and ⌥⌘→ walk.</td></tr>
 <tr><td><b>Live tunnels</b></td><td>Local, remote and SOCKS. A switch opens or closes a tunnel on an open connection, with no reconnect.</td></tr>
 <tr><td><b>A file browser</b></td><td>This Mac on the left, the far host on the right. Drag both ways, with Finder file promises.</td></tr>
@@ -201,6 +202,32 @@ ssh -S <socket> -O exit             closes everything
 
 The master is separate from every pane, so you can close all the panes and
 keep the connection and its tunnels alive.
+
+### The terminal the server sees
+
+Termora draws with the Ghostty engine, and Ghostty calls itself
+`xterm-ghostty`. OpenSSH copies `TERM` into the request for the far terminal,
+and almost no server holds that description, so `htop`, `vim`, and `less` stop
+with `Error opening terminal: xterm-ghostty`.
+
+Termora puts the description on the server itself, once, as soon as the master
+is up:
+
+```
+infocmp -x xterm-ghostty                     from the description inside Termora
+ssh -S <socket> <host> sh -c '…tic -x -o "$HOME/.terminfo" -…'
+```
+
+The work rides the control master, so nobody is asked for a password again. It
+writes one file, `~/.terminfo/78/xterm-ghostty`, and nothing else. A record in
+`~/Library/Caches/Termora/terminfo.json` keeps Termora from doing it twice; a
+new version of the description replaces the old one.
+
+A server that has no `tic`, or a read-only home directory, is left alone. The
+pane then announces `xterm-256color`, which every server understands, so the
+connection always works. Every pane runs
+`/usr/bin/env TERM=<name> /usr/bin/ssh …`, and the name is the one the server
+proved it understands.
 
 ### Tunnels
 

@@ -65,6 +65,40 @@ final class SSHIntegrationTests {
         #expect(connection.state == .disconnected)
     }
 
+    @Test("The terminal description reaches the far host over the master")
+    func installsTheTerminalDescription() async throws {
+        try #require(FileManager.default.isExecutableFile(atPath: "/usr/bin/tic"))
+
+        let id = UUID()
+        let connection = await engine.connect(
+            id: id, name: "test", target: target(keyPath: server.plainKeyPath, passphrase: "")
+        )
+        #expect(connection.state == .connected, "The master must connect. Log: \(connection.log)")
+
+        // A directory of its own, so the test never writes into a real home.
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("terminfo-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        // xterm-256color, because every Mac holds that description. The name
+        // does not matter here: the path it takes is the same one.
+        let terminal = LocalTerminal(name: "xterm-256color")
+        let source = try #require(await RemoteTerminfo.source(of: terminal))
+        let result = await connection.run(
+            RemoteTerminfo.installWords(for: terminal.name, directory: directory.path),
+            limit: RemoteTerminfo.limit,
+            input: source
+        )
+
+        #expect(result.succeeded, "The far tic failed: \(result.errorOutput)")
+        // `tic` files a description under the first letter of its name.
+        #expect(FileManager.default.fileExists(
+            atPath: directory.appendingPathComponent("78/xterm-256color").path
+        ))
+
+        await engine.disconnect(id: id)
+    }
+
     @Test("A locked key is opened with the stored passphrase, through the real helper")
     func passphraseComesFromTheStoredSecret() async throws {
         delegate.storedAnswer = server.passphrase

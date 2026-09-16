@@ -1,0 +1,23 @@
+{
+  "name": "termora",
+  "owner": {
+    "name": "Fabrizio Balliano",
+    "url": "https://github.com/fballiano/termora"
+  },
+  "metadata": {
+    "description": "Agent integrations for Termora, the macOS SSH connection manager.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "termora",
+      "source": "./plugins/termora",
+      "description": "Run commands on your saved SSH servers through the Termora application.",
+      "version": "1.0.0",
+      "author": { "name": "Fabrizio Balliano" },
+      "homepage": "https://github.com/fballiano/termora",
+      "license": "MIT",
+      "keywords": ["ssh", "termora", "macos", "servers"]
+    }
+  ]
+}

@@ -114,7 +114,8 @@ and run `xcodegen generate` again.
 | `Packages/TermoraImport` | The Royal TSX reader and the AppleScript bridge |
 | `Packages/TermoraSFTP` | The SFTP version 3 client and the file browser model |
 | `TermoraUITests` | Tests that drive the real application |
-| `Tools/` | The `termora-askpass` helper |
+| `Tools/` | The `termora-askpass` helper and the `termora` command |
+| `Agents/`, `plugins/` | The agent integrations, one folder per agent |
 
 ## Terminal configuration
 
@@ -331,11 +332,33 @@ the service, so a locked document gives away nothing, not even the names.
 Exit code 2 means the application is not running, the document is locked, or
 the request was refused; the reason is one line on standard error.
 
-One line for a project `CLAUDE.md`:
+### Teaching your agent
+
+`termora --help` prints the whole contract: the three verbs, the shape of
+each line of output, the exit codes, and the rule that no password reaches
+the tool. Most agents read help before they use a command they do not know,
+so this alone is often enough.
+
+The `Agents/` folder holds the same text in the format that each agent
+reads:
+
+| Agent | How to install it |
+|---|---|
+| Claude Code | `/plugin marketplace add fballiano/termora`, then `/plugin install termora@termora` |
+| Codex, Amp, Zed, and others | Paste `Agents/AGENTS.snippet.md` into your `AGENTS.md` |
+| Gemini CLI | `gemini extensions install https://github.com/fballiano/termora` |
+| Cursor | Copy `Agents/cursor/termora.mdc` into `.cursor/rules/` |
+
+The shortest form, for a project `AGENTS.md` or `CLAUDE.md`:
 
 ```
 `termora run <bookmark> -- <command…>` runs a command on a saved SSH server; `termora list` names the bookmarks.
 ```
+
+An agent runs `termora` through its shell tool, and most agents block a new
+command until you allow it. In Claude Code the permission is
+`Bash(termora:*)`. Without it the agent reports that the command was
+blocked, which looks like a Termora fault and is not one.
 
 ## Importing from Royal TSX
 

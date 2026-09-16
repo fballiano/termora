@@ -1,0 +1,10 @@
+{
+  "name": "termora",
+  "description": "Run commands on your saved SSH servers through the Termora application.",
+  "version": "1.0.0",
+  "author": { "name": "Fabrizio Balliano" },
+  "homepage": "https://github.com/fballiano/termora",
+  "repository": "https://github.com/fballiano/termora",
+  "license": "MIT",
+  "keywords": ["ssh", "termora", "macos", "servers"]
+}

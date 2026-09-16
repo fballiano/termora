@@ -19,10 +19,49 @@
 
 import Foundation
 
+/// The short form. A wrong verb prints this, so an agent reads three lines
+/// and one pointer rather than a page.
 let usage = """
 usage: termora list
        termora status
        termora run <bookmark> -- <command...>
+
+Run `termora --help` for the whole contract.
+"""
+
+/// The whole contract, for a person or an agent that asks for it.
+let helpText = """
+usage: termora list
+       termora status
+       termora run <bookmark> -- <command...>
+
+Termora keeps the SSH connections. This tool asks the running application
+to use one. It holds no password and it reads no document.
+
+  list    Prints every bookmark, one per line, sorted.
+          A bookmark inside folders prints as "Prod / Web / web1".
+
+  status  Prints one line for each open connection:
+          name, a tab, the state, a tab, the number of tunnels.
+          The state is idle, connecting, connected, failed, or disconnected.
+
+  run     Runs a command on a bookmark and streams the output.
+          Give the full name that `list` prints, or a bare name that is
+          unique. Put every word of the command after `--`.
+          Termora opens the connection when it is closed.
+
+Examples:
+  termora run web1 -- uptime
+  termora run "Prod / Web / web1" -- systemctl is-active nginx
+
+Exit codes:
+  0   The request succeeded.
+  2   Termora is not running, the document is locked, or the request
+      was refused. The reason is one line on standard error.
+  *   `run` exits with the exit code of the far command.
+
+Termora asks you for a password or a passphrase in its own window. The
+password never reaches this tool, the command line, or the environment.
 """
 
 func fail(_ message: String, code: Int32) -> Never {
@@ -44,6 +83,12 @@ func reply(for request: AgentRequest) -> AgentReply {
 let arguments = Array(CommandLine.arguments.dropFirst())
 
 switch arguments.first {
+case "help", "--help", "-h":
+    // An agent reads `--help` before it uses an unknown command, so the
+    // text goes to standard output and the tool succeeds.
+    print(helpText)
+    exit(0)
+
 case "list":
     for row in reply(for: AgentRequest(command: .list)).bookmarks ?? [] {
         print(row.path.isEmpty ? row.name : "\(row.path) / \(row.name)")
